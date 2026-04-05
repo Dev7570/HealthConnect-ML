@@ -139,7 +139,7 @@ function AuthPage({onSuccess}){
   );
 }
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = "https://healthconnect-backend-pcun.onrender.com";
 
 function BookingModal({doctor,hospital,user,onClose,onBooked}){
   const [step,setStep]=useState(1);
