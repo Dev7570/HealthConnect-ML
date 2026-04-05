@@ -266,7 +266,7 @@ app.get("/admin/appointments", async (req, res) => {
 // 🔒 ML API GATEWAY — Proxy to Python ML Service
 // ========================================
 
-const ML_API_URL = process.env.ML_API_URL || "http://localhost:5001";
+const ML_API_URL = "https://healthconnect-ml.onrender.com";
 
 // Simple rate limiter: max 10 predictions per minute per IP
 const rateLimitMap = new Map();
