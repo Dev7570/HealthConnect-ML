@@ -2,6 +2,7 @@ services:
   # 🖥️ Node.js API Gateway (Backend)
   - type: web
     name: healthconnect-backend
+        plan: free
     env: node
     rootDir: healthconnect-backend
     buildCommand: npm install
@@ -13,6 +14,7 @@ services:
         fromService:
           type: web
           name: healthconnect-ml
+              plan: free
           envVarKey: RENDER_EXTERNAL_URL
       - key: GOOGLE_PLACES_API_KEY
         sync: false # User must set this manually in the dashboard
