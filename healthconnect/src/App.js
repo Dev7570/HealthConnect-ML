@@ -872,7 +872,7 @@ export default function App(){
                 <div style={{flex:1}}><div style={{fontWeight:800,fontSize:16,marginBottom:3}}>{doc.name}</div><div style={{display:"flex",gap:8,marginBottom:6,flexWrap:"wrap"}}><Badge color={`${selectedHospital.color}14`} text={selectedHospital.color}>{doc.spec}</Badge><Badge color="#FFFBEB" text="#92400E">Available: {doc.available}</Badge></div><Star rating={doc.rating}/></div>
                 <div style={{textAlign:"right",flexShrink:0}}>
                   <div style={{fontSize:22,fontWeight:900,color:"#0F4C81",marginBottom:4}}>₹{doc.fee}</div>
-                  <button onClick={()=>handleBookClick(doc)} style={btn({background:`linear-gradient(135deg,${selectedHospital.color},${selectedHospital.color}BB)`,color: `var(--bg-card)`,padding:"10px 20px"})}>{user?"Book Appointment":"🔐 Login to Book"}</button>
+                  <button onClick={()=>setBookingDoctor(doc)} style={btn({background:`linear-gradient(135deg,${selectedHospital.color},${selectedHospital.color}BB)`,color: `var(--bg-card)`,padding:"10px 20px"})}>{user?"Book Appointment":"🔐 Login to Book"}</button>
                 </div>
               </div>
             </div>)}
