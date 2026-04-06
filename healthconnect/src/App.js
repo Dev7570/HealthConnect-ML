@@ -148,7 +148,7 @@ function AuthPage({onSuccess}){
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0F4C81,#1565C0,#42A5F5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
       <div style={{background: `var(--bg-card)`,borderRadius:24,padding:40,width:"100%",maxWidth:420,boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
         <div style={{textAlign:"center",marginBottom:28}}>
-          <img src="/pulserate-logo.png" alt="PulseRATE Logo" style={{height: 72, marginBottom: 8}} />
+          <img src="/pulserate-logo.png?v=2" alt="PulseRATE Logo" style={{height: 72, marginBottom: 8}} />
           <div style={{fontSize:14,color: `var(--text-muted)`,marginTop:4}}>{isLogin?"Welcome back! Please login.":"Create your account"}</div>
         </div>
         {!isLogin && <input value={name} onChange={e=>setName(e.target.value)} placeholder="Full Name" style={inp}/>}
@@ -703,7 +703,7 @@ export default function App(){
       <nav style={{background:"linear-gradient(135deg,#0F4C81,#1565C0)",padding:"0 20px",position:"sticky",top:0,zIndex:500,boxShadow:"0 2px 20px rgba(15,76,129,0.4)"}}>
         <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",gap:16,height:60}}>
           <div style={{display: "flex", alignItems: "center", gap: 10, cursor:"pointer"}} onClick={()=>go("home")}>
-            <img src="/pulserate-logo.png" alt="PulseRATE Logo" style={{height: 32, filter: "brightness(0) invert(1)"}} />
+            <img src="/pulserate-logo.png?v=2" alt="PulseRATE Logo" style={{height: 32, filter: "brightness(0) invert(1)"}} />
             <div style={{color: `var(--bg-card)`,fontWeight:900,fontSize:20, letterSpacing: 1}}>PULSERATE</div>
           </div>
           <div style={{flex:1}}/>
@@ -1466,7 +1466,7 @@ export default function App(){
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:32,marginBottom:32}}>
             <div>
               <div style={{display: "flex", alignItems: "center", gap: 10, marginBottom: 16}}>
-                <img src="/pulserate-logo.png" alt="PulseRATE Logo" style={{height: 32, filter: "brightness(0) invert(1)"}} />
+                <img src="/pulserate-logo.png?v=2" alt="PulseRATE Logo" style={{height: 32, filter: "brightness(0) invert(1)"}} />
                 <div style={{fontSize:22,fontWeight:900}}>PULSERATE</div>
               </div>
               <div style={{fontSize:13,opacity:0.7,lineHeight:1.8}}>India's trusted healthcare platform. Find, compare, and book the best care near you.</div>
