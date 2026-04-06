@@ -25,6 +25,7 @@ connectDB();
 // 📝 Import Models
 const Appointment = require("./models/Appointment");
 const Review = require("./models/Review");
+const Doctor = require("./models/Doctor");
 app.use(cors());
 app.use(express.json());
 
@@ -103,47 +104,109 @@ app.get("/", (req, res) => {
 // ========================================
 
 // 📦 In-memory storage is replaced by MongoDB!
-let appointmentIdCounter = 10000;
-
-// 👨‍⚕️ Doctor database (realistic demo data)
-const DOCTORS_DB = [
-  { id: 1, name: "Dr. Priya Sharma", spec: "Cardiology", exp: 15, fee: 800, available: "Today", rating: 4.8, img: "👩‍⚕️", slots: ["9:00 AM","10:00 AM","11:00 AM","2:00 PM","3:00 PM"] },
-  { id: 2, name: "Dr. Rajesh Kumar", spec: "Orthopedics", exp: 12, fee: 700, available: "Today", rating: 4.6, img: "👨‍⚕️", slots: ["9:30 AM","10:30 AM","2:30 PM","3:30 PM","4:00 PM"] },
-  { id: 3, name: "Dr. Anita Desai", spec: "Neurology", exp: 18, fee: 1000, available: "Tomorrow", rating: 4.9, img: "👩‍⚕️", slots: ["10:00 AM","11:00 AM","2:00 PM","4:00 PM"] },
-  { id: 4, name: "Dr. Vikram Singh", spec: "General Medicine", exp: 8, fee: 500, available: "Today", rating: 4.5, img: "👨‍⚕️", slots: ["9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","2:00 PM","2:30 PM","3:00 PM"] },
-  { id: 5, name: "Dr. Meera Patel", spec: "Pediatrics", exp: 10, fee: 600, available: "Today", rating: 4.7, img: "👩‍⚕️", slots: ["9:00 AM","10:00 AM","11:00 AM","3:00 PM","4:00 PM"] },
-  { id: 6, name: "Dr. Arjun Nair", spec: "Gastroenterology", exp: 14, fee: 900, available: "Tomorrow", rating: 4.4, img: "👨‍⚕️", slots: ["10:00 AM","11:00 AM","2:30 PM","3:30 PM"] },
-  { id: 7, name: "Dr. Sunita Reddy", spec: "Oncology", exp: 20, fee: 1200, available: "Today", rating: 4.9, img: "👩‍⚕️", slots: ["9:30 AM","10:30 AM","2:00 PM"] },
-  { id: 8, name: "Dr. Amit Joshi", spec: "Nephrology", exp: 11, fee: 750, available: "Today", rating: 4.3, img: "👨‍⚕️", slots: ["9:00 AM","10:00 AM","11:00 AM","2:00 PM","3:00 PM","4:00 PM"] },
-  { id: 9, name: "Dr. Kavita Menon", spec: "Emergency", exp: 9, fee: 500, available: "Today", rating: 4.6, img: "👩‍⚕️", slots: ["9:00 AM","10:00 AM","2:00 PM","3:00 PM","4:00 PM"] },
-  { id: 10, name: "Dr. Sanjay Gupta", spec: "Surgery", exp: 22, fee: 1500, available: "Tomorrow", rating: 4.8, img: "👨‍⚕️", slots: ["10:00 AM","11:00 AM","2:00 PM"] },
+// 👨‍⚕️ Doctor database generation logic (now for seeding)
+const DOCTORS_CORE = [
+  { name: "Priya Sharma", spec: "Cardiology", exp: 15, fee: 800, rating: 4.8, img: "👩‍⚕️" },
+  { name: "Rajesh Kumar", spec: "Orthopedics", exp: 12, fee: 700, rating: 4.6, img: "👨‍⚕️" },
+  { name: "Anita Desai", spec: "Neurology", exp: 18, fee: 1000, rating: 4.9, img: "👩‍⚕️" },
+  { name: "Vikram Singh", spec: "General Medicine", exp: 8, fee: 500, rating: 4.5, img: "👨‍⚕️" },
+  { name: "Meera Patel", spec: "Pediatrics", exp: 10, fee: 600, rating: 4.7, img: "👩‍⚕️" },
+  { name: "Arjun Nair", spec: "Gastroenterology", exp: 14, fee: 900, rating: 4.4, img: "👨‍⚕️" },
+  { name: "Sunita Reddy", spec: "Oncology", exp: 20, fee: 1200, rating: 4.9, img: "👩‍⚕️" },
+  { name: "Amit Joshi", spec: "Nephrology", exp: 11, fee: 750, rating: 4.3, img: "👨‍⚕️" },
+  { name: "Kavita Menon", spec: "Emergency", exp: 9, fee: 500, rating: 4.6, img: "👩‍⚕️" },
+  { name: "Sanjay Gupta", spec: "Surgery", exp: 22, fee: 1500, rating: 4.8, img: "👨‍⚕️" },
+  { name: "Ritu Agarwal", spec: "Dermatology", exp: 9, fee: 650, rating: 4.7, img: "👩‍⚕️" },
+  { name: "Nikhil Verma", spec: "Psychiatry", exp: 13, fee: 850, rating: 4.5, img: "👨‍⚕️" },
+  { name: "Pooja Iyer", spec: "Ophthalmology", exp: 7, fee: 600, rating: 4.6, img: "👩‍⚕️" },
+  { name: "Suresh Bhat", spec: "ENT", exp: 16, fee: 700, rating: 4.4, img: "👨‍⚕️" },
+  { name: "Anjali Kapoor", spec: "Urology", exp: 11, fee: 800, rating: 4.5, img: "👩‍⚕️" }
 ];
 
-// 👨‍⚕️ Get doctors for a hospital (assigns 3-4 random doctors per hospital)
-app.get("/doctors", (req, res) => {
-  const hospitalId = parseInt(req.query.hospitalId) || 1;
+const LAST_NAMES = ["Bose", "Chopra", "Das", "Fernandez", "Gill", "Hussain", "JAIN", "Kapoor", "Lodi", "Mishra", "Naqvi", "Oza", "Pandey", "Qureshi", "Rangan", "Shah", "Tiwari", "Upadhyay", "Vohra", "Walia", "Yadav", "Zaveri"];
+const SPECS = [
+  "Cardiology", "Neurology", "Orthopedics", "Oncology", "Pediatrics",
+  "Gastroenterology", "Nephrology", "General Medicine", "Emergency", "Surgery",
+  "Dermatology", "Psychiatry", "Ophthalmology", "ENT", "Urology",
+  "Endocrinology", "Pulmonology", "Rheumatology"
+];
+
+// 🚀 Seed Doctors to MongoDB
+async function seedDoctors() {
+  try {
+    const docCount = await Doctor.countDocuments();
+    if (docCount === 0) {
+      console.log("🌱 Seeding initial 120+ docs into MongoDB...");
+      const doctorsToInsert = [];
+      for (let i = 0; i < 120; i++) {
+        const core = DOCTORS_CORE[i % DOCTORS_CORE.length];
+        const lName = LAST_NAMES[i % LAST_NAMES.length];
+        const spec = SPECS[i % SPECS.length];
+        
+        doctorsToInsert.push({
+          id: i + 1,
+          name: `Dr. ${core.name.split(" ")[0]} ${lName}`,
+          spec: spec,
+          exp: Math.floor(Math.random() * 25) + 5,
+          fee: Math.floor(Math.random() * 10) * 100 + 500,
+          available: i % 2 === 0 ? "Today" : "Tomorrow",
+          rating: (Math.random() * 1.5 + 3.5).toFixed(1),
+          img: i % 2 === 0 ? "👨‍⚕️" : "👩‍⚕️",
+          email: `${core.name.split(" ")[0].toLowerCase()}.${lName.toLowerCase()}@healthconnect.doc`,
+          slots: ["9:00 AM", "10:30 AM", "2:00 PM", "4:30 PM"]
+        });
+      }
+      await Doctor.insertMany(doctorsToInsert);
+      console.log("✅ 120+ doctors seeded successfully!");
+    } else {
+      console.log(`📦 Doctor collection already populated (${docCount} entries).`);
+    }
+  } catch (err) {
+    console.error("❌ Seeding Error:", err);
+  }
+}
+seedDoctors();
+
+// 👨‍⚕️ Get doctors (Global support + Hospital filtering from MongoDB)
+app.get("/doctors", async (req, res) => {
+  const hospitalId = parseInt(req.query.hospitalId);
   const spec = req.query.spec || "";
+  const query = req.query.q || "";
 
-  // Assign doctors based on hospital ID (deterministic selection)
-  const startIdx = (hospitalId - 1) % DOCTORS_DB.length;
-  const count = 3 + (hospitalId % 2); // 3 or 4 doctors per hospital
-  let doctors = [];
-  for (let i = 0; i < count; i++) {
-    const doc = { ...DOCTORS_DB[(startIdx + i * 3) % DOCTORS_DB.length] };
-    doc.id = hospitalId * 100 + i + 1;
-    doctors.push(doc);
+  try {
+    let doctors = [];
+
+    if (hospitalId) {
+      // Simulate hospital-specific doctors from the global pool (using deterministic logic)
+      const startIdx = (hospitalId - 1) % 120;
+      const allDBDocs = await Doctor.find().sort({ id: 1 }).lean();
+      for (let i = 0; i < 6; i++) {
+        const doc = { ...allDBDocs[(startIdx + i * 7) % allDBDocs.length] };
+        doc.id = hospitalId * 1000 + i; // Local unique ID for front-end stability
+        doctors.push(doc);
+      }
+    } else {
+      // Global MongoDB search
+      let filter = {};
+      if (spec && spec !== "All") filter.spec = new RegExp(`^${spec}$`, "i");
+      if (query) {
+        filter.$or = [
+          { name: new RegExp(query, "i") },
+          { spec: new RegExp(query, "i") }
+        ];
+      }
+      doctors = await Doctor.find(filter).sort({ id: 1 }).lean();
+    }
+
+    res.json({ success: true, total: doctors.length, doctors });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
-
-  if (spec && spec !== "All") {
-    doctors = doctors.filter(d => d.spec.toLowerCase().includes(spec.toLowerCase()));
-  }
-
-  res.json({ success: true, doctors });
 });
 
 // 📅 Book an appointment (MongoDB)
 app.post("/appointments", async (req, res) => {
-  const { doctorName, doctorSpec, hospitalName, hospitalId, date, time, patientName, patientAge, patientEmail, reason, fee } = req.body;
+  const { doctorName, doctorSpec, doctorEmail, hospitalName, hospitalId, date, time, patientName, patientAge, patientEmail, reason, fee } = req.body;
 
   if (!doctorName || !hospitalName || !date || !time || !patientName || !patientEmail) {
     return res.status(400).json({ success: false, error: "Missing required fields" });
@@ -155,7 +218,7 @@ app.post("/appointments", async (req, res) => {
   try {
     const appointment = new Appointment({
       id: idStr,
-      doctorName, doctorSpec, hospitalName, hospitalId,
+      doctorName, doctorSpec, doctorEmail, hospitalName, hospitalId,
       date, time, patientName, patientAge, patientEmail, reason, fee
     });
     
@@ -173,7 +236,11 @@ app.post("/appointments", async (req, res) => {
 // 📋 Get appointments for a user (MongoDB)
 app.get("/appointments/:email", async (req, res) => {
   try {
-    const appointments = await Appointment.find({ patientEmail: req.params.email }).sort({ bookedAt: -1 });
+    // If it's a doctor email, check doctorEmail field, else patientEmail
+    const isDoc = req.params.email.endsWith("@healthconnect.doc");
+    const query = isDoc ? { doctorEmail: req.params.email } : { patientEmail: req.params.email };
+    
+    const appointments = await Appointment.find(query).sort({ bookedAt: -1 });
     res.json({ success: true, total: appointments.length, appointments });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

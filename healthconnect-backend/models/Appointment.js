@@ -13,6 +13,7 @@ const appointmentSchema = new mongoose.Schema({
   patientEmail: { type: String, required: true },
   reason: { type: String, default: "General Consultation" },
   fee: { type: Number, default: 500 },
+  doctorEmail: { type: String },
   status: { type: String, default: "Confirmed" },
   bookedAt: { type: Date, default: Date.now }
 });

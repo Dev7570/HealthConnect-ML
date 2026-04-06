@@ -16,16 +16,19 @@ services:
           name: healthconnect-ml
           envVarKey: RENDER_EXTERNAL_URL
       - key: GOOGLE_PLACES_API_KEY
-        sync: false # User must set this manually in the dashboard
+        sync: false 
+      - key: MONGO_URI
+        sync: false # User must set this manually in the dashboard for production persistence
 
   # 🧠 Python ML API Service
   - type: web
     name: healthconnect-ml
     env: python
-    plan: free
+    plan: free # Note: Upgrade to 'starter' for auto-scaling
     rootDir: healthconnect-ml
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -b 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --workers 4 --threads 2 --timeout 60 -b 0.0.0.0:$PORT app:app
+    healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0

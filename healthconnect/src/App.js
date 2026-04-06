@@ -25,7 +25,12 @@ L.Icon.Default.mergeOptions({
 const COLORS = ["#0066CC","#E8432D","#00A651","#6B21A8","#F59E0B","#0F766E","#DC2626","#7C3AED","#059669","#D97706"];
 
 const ALL_TESTS = ["Blood Test (CBC)","MRI Brain","CT Scan Chest","ECG","X-Ray","Lipid Profile"];
-const SPECIALITIES = ["All","Cardiology","Neurology","Orthopedics","Oncology","Pediatrics","Gastroenterology","Nephrology","General Medicine","Emergency","Surgery"];
+const SPECIALITIES = [
+  "All","Cardiology","Neurology","Orthopedics","Oncology","Pediatrics",
+  "Gastroenterology","Nephrology","General Medicine","Emergency","Surgery",
+  "Dermatology","Psychiatry","Ophthalmology","ENT","Urology",
+  "Endocrinology","Pulmonology","Rheumatology"
+];
 const TIME_SLOTS = ["9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM"];
 
 // 🏥 Health Tips Data
@@ -56,12 +61,29 @@ const Star = ({rating,size=14}) => <span>{[1,2,3,4,5].map(s=><span key={s} style
 const Badge = ({children,color="#EFF6FF",text="#1D4ED8"}) => <span style={{background:color,color:text,fontSize:11,fontWeight:600,padding:"2px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{children}</span>;
 
 function RealMap({hospitals,onSelect}){
-  if(!hospitals || hospitals.length === 0) return null;
-  const center = [hospitals[0].lat || 28.6139, hospitals[0].lng || 77.209];
+  // India-wide center by default
+  const center = hospitals.length > 0
+    ? [hospitals[0].lat || 28.6139, hospitals[0].lng || 77.209]
+    : [20.5937, 78.9629];
+
+  const CITY_PINS = [
+    { name: "Delhi",     lat: 28.6139, lng: 77.2090 },
+    { name: "Mumbai",    lat: 19.0760, lng: 72.8777 },
+    { name: "Bangalore", lat: 12.9716, lng: 77.5946 },
+    { name: "Chennai",   lat: 13.0827, lng: 80.2707 },
+    { name: "Hyderabad", lat: 17.3850, lng: 78.4867 },
+    { name: "Pune",      lat: 18.5204, lng: 73.8567 },
+    { name: "Kolkata",   lat: 22.5726, lng: 88.3639 },
+    { name: "Ahmedabad", lat: 23.0225, lng: 72.5714 },
+  ];
+
   return(
-    <div style={{borderRadius:16,overflow:"hidden",height:420,border:"1px solid #CBD5E1"}}>
-      <MapContainer center={center} zoom={11} style={{height:"100%",width:"100%"}}>
-        <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+    <div style={{borderRadius:16,overflow:"hidden",height: hospitals.length > 0 ? 420 : 600, border:"1px solid #CBD5E1"}}>
+      <MapContainer center={center} zoom={hospitals.length > 0 ? 11 : 5} style={{height:"100%",width:"100%"}}>
+        <TileLayer 
+          attribution='&copy; <a href="https://carto.com/">CartoDB</a>' 
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        />
         {hospitals.map((h,i)=>(
           <Marker key={h.id} position={[h.lat || 28.6139, h.lng || 77.209]}>
             <Popup>
@@ -69,12 +91,19 @@ function RealMap({hospitals,onSelect}){
                 <div style={{fontWeight:800,fontSize:14,marginBottom:4}}>{h.name}</div>
                 <div style={{fontSize:12,color: `var(--text-muted)`,marginBottom:6}}>📍 {h.address}</div>
                 <div style={{fontSize:13,marginBottom:8}}>⭐ {h.rating} · {h.reviews.toLocaleString()} reviews</div>
-                {h.phone && h.phone !== "N/A" && <div style={{fontSize:12,color: `var(--text-secondary)`,marginBottom:8}}>📞 {h.phone}</div>}
                 <div style={{display:"flex",gap:6}}>
                   <a href={`https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}`} target="_blank" rel="noreferrer" style={{background:"#1E88E5",color: `var(--bg-card)`,padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,textDecoration:"none"}}>🗺️ Directions</a>
                   <button onClick={()=>onSelect(h)} style={{background:h.color,color: `var(--bg-card)`,padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer"}}>View</button>
                 </div>
               </div>
+            </Popup>
+          </Marker>
+        ))}
+        {hospitals.length === 0 && CITY_PINS.map((city) => (
+          <Marker key={city.name} position={[city.lat, city.lng]}>
+            <Popup>
+              <strong>🏥 {city.name}</strong><br />
+              Search hospitals in {city.name}
             </Popup>
           </Marker>
         ))}
@@ -162,9 +191,18 @@ function BookingModal({doctor,hospital,user,onClose,onBooked}){
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          doctorName: doctor.name, doctorSpec: doctor.spec, hospitalName: hospital.name,
-          hospitalId: hospital.id, date, time: slot, patientName: name, phone,
-          patientAge: age, patientEmail: user?.email, reason, fee: doctor.fee,
+          doctorName: doctor.name,
+          doctorSpec: doctor.spec,
+          doctorEmail: doctor.email,
+          hospitalName: hospital.name,
+          hospitalId: hospital.id,
+          date,
+          time: slot,
+          patientName: name,
+          patientAge: age,
+          patientEmail: user?.email,
+          reason,
+          fee: doctor.fee
         }),
       });
       const data = await res.json();
@@ -174,6 +212,7 @@ function BookingModal({doctor,hospital,user,onClose,onBooked}){
         if (onBooked) onBooked();
       }
     } catch (err) {
+      // Fallback for demo if backend fails
       setBookingId("HC" + Math.floor(Math.random() * 90000 + 10000));
       setDone(true);
       if (onBooked) onBooked();
@@ -365,6 +404,13 @@ export default function App(){
   const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [apiError, setApiError] = useState(null);
 
+  // 👨‍⚕️ Global Doctors state
+  const [allDoctors, setAllDoctors] = useState([]);
+  const [loadingAllDocs, setLoadingAllDocs] = useState(false);
+  const [docSearch, setDocSearch] = useState("");
+  const [docSpecFilter, setDocSpecFilter] = useState("All");
+  const [docMapView, setDocMapView] = useState(false);
+
   // ✅ Fetch real hospitals from backend
   const fetchHospitals = async (city = "New Delhi") => {
     setLoadingHospitals(true);
@@ -469,6 +515,24 @@ export default function App(){
     return ms&&mf;
   }).sort((a,b)=>sortBy==="rating"?b.rating-a.rating:b.reviews-a.reviews);
 
+  // 🆕 Fetch all doctors from backend
+  const fetchAllDoctors = async () => {
+    setLoadingAllDocs(true);
+    try {
+      const res = await fetch(`${API_URL}/doctors?spec=${docSpecFilter === "All" ? "" : docSpecFilter}&q=${docSearch}`);
+      const data = await res.json();
+      if (data.success) {
+        // Enforce hospital coordinates for mapping (fallback to Delhi center)
+        const docsWithCoords = data.doctors.map(d => {
+          const hosp = hospitals.find(h => h.id === Math.floor(d.id / 1000)) || hospitals[0] || { lat: 28.6139, lng: 77.209, name: "Hospital Location" };
+          return { ...d, lat: hosp.lat, lng: hosp.lng, hospitalName: hosp.name };
+        });
+        setAllDoctors(docsWithCoords);
+      }
+    } catch (err) { /* fallback */ }
+    setLoadingAllDocs(false);
+  };
+
   const go = async (v, h = null) => {
     setView(v);
     if (h) {
@@ -479,11 +543,20 @@ export default function App(){
     }
     if (v === "detail" && h) fetchReviews(h.id);
     if (v === "appointments") fetchMyAppointments();
+    if (v === "doctors") fetchAllDoctors();
   };
   const notifShow=(m)=>{setNotif(m);setTimeout(()=>setNotif(null),3000);};
   const toggleTest=(t)=>setSelectedTests(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
+  const bookSpecialist = async (disease) => {
+    if (!user) { setShowAuth(true); return; }
+    const specMapping = { heart: "Cardiology", cancer: "Oncology", diabetes: "General Medicine" };
+    const spec = specMapping[disease] || "General Medicine";
+    setDocSpecFilter(spec);
+    go("doctors");
+    notifShow(`AI Recommendation: Consulting a ${spec} specialist.`);
+  };
+
   const handleLogout=async()=>{ await signOut(auth); notifShow("Logged out successfully!"); };
-  const handleBookClick=(doc)=>{ if(!user){ setShowAuth(true); } else { setBookingDoctor(doc); } };
 
   // 🤖 AI Checkup helpers (routed through Node.js API gateway)
   const ML_API = `${API_URL}/ml`;
@@ -554,16 +627,8 @@ export default function App(){
     setLoadingHistory(false);
   };
 
-  // 🏥 Smart booking from AI results
-  const DISEASE_SPECIALIST = { heart: "Cardiology", cancer: "Oncology", diabetes: "General Medicine" };
-  const bookSpecialist = async (disease) => {
-    if (!user) { setShowAuth(true); return; }
-    const spec = DISEASE_SPECIALIST[disease] || "General Medicine";
-    setSpecFilter(spec);
-    await fetchHospitals(cityInput);
-    go("list");
-    notifShow(`Showing ${spec} specialists. Select a hospital to book.`);
-  };
+  const isAdmin = user?.email === "admin@healthconnect.com";
+  const isDoctor = user?.email?.endsWith("@healthconnect.doc");
 
   // 🛡️ Fetch Admin Stats
   const fetchAdminStats = async () => {
@@ -641,7 +706,7 @@ export default function App(){
         <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",gap:16,height:60}}>
           <div style={{color: `var(--bg-card)`,fontWeight:900,fontSize:20,cursor:"pointer"}} onClick={()=>go("home")}>🩺 HealthConnect</div>
           <div style={{flex:1}}/>
-          {[["Hospitals","list"],["Compare","compare"],["🗺️ Map","map"],["🤖 AI Checkup","ai-checkup"],...(user?[["📊 My Health","health-history"]]:[]),["🚨 SOS","emergency"],["💡 Tips","tips"],...(user?[["📋 My Appts","appointments"]]:[]),...(isAdmin?[["🛡️ Admin","admin"]]:[])].map(([l,v])=><span key={v} onClick={()=>{go(v);if(v==="ai-checkup")fetchAiModels();if(v==="health-history")fetchHealthHistory();if(v==="admin")fetchAdminStats();}} style={{color: `var(--bg-card)`,fontSize:13,cursor:"pointer",fontWeight:600,padding:"6px 10px",borderRadius:8,background:view===v?"rgba(255,255,255,0.2)":"transparent"}}>{l}</span>)}
+          {[["Hospitals","list"],["Doctors","doctors"],["Compare","compare"],["🗺️ Map","map"],["🤖 AI Checkup","ai-checkup"],...(user&&!isDoctor?[["📊 My Health","health-history"]]:[]),...(isDoctor?[["👨‍⚕️ Dashboard","doctor-dash"]]:[]),["🚨 SOS","emergency"],["💡 Tips","tips"],...(user?[["📋 My Appts","appointments"]]:[]),...(isAdmin?[["🛡️ Admin","admin"]]:[])].map(([l,v])=><span key={v} onClick={()=>{go(v);if(v==="ai-checkup")fetchAiModels();if(v==="health-history")fetchHealthHistory();if(v==="admin")fetchAdminStats(); if(v==="doctors") fetchAllDoctors();}} style={{color: `var(--bg-card)`,fontSize:13,cursor:"pointer",fontWeight:600,padding:"6px 10px",borderRadius:8,background:view===v?"rgba(255,255,255,0.2)":"transparent"}}>{l}</span>)}
           {/* 🌙 Dark Mode Toggle */}
           <button onClick={()=>setIsDark(d=>!d)} title={isDark?"Switch to Light Mode":"Switch to Dark Mode"} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:20,padding:"5px 12px",color:"white",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",gap:6,fontWeight:700,backdropFilter:"blur(4px)",transition:"background 0.2s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.25)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.15)"}>{isDark?"☀️":"🌙"}</button>
           {user ? (
@@ -692,7 +757,7 @@ export default function App(){
 
           {/* Stats */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:32}}>
-            {[[hospitals.length||"20+","Hospitals Found","#EFF6FF","#1E88E5"],["9","Doctors Available","#F0FDF4","#10B981"],["6","Tests to Compare","#FFFBEB","#F59E0B"],["24/7","Emergency Support","#FFF1F2","#EF4444"]].map(([v,l,bg,c])=><div key={l} style={{background:bg,borderRadius:14,padding:20,textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:c}}>{v}</div><div style={{fontSize:12,color: `var(--text-muted)`,fontWeight:600,marginTop:4}}>{l}</div></div>)}
+            {[[hospitals.length||"20+","Hospitals Found","#EFF6FF","#1E88E5"],["120+","Doctors Available","#F0FDF4","#10B981"],["6","Tests to Compare","#FFFBEB","#F59E0B"],["24/7","Emergency Support","#FFF1F2","#EF4444"]].map(([v,l,bg,c])=><div key={l} style={{background:bg,borderRadius:14,padding:20,textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:c}}>{v}</div><div style={{fontSize:12,color: `var(--text-muted)`,fontWeight:600,marginTop:4}}>{l}</div></div>)}
           </div>
 
           {!user&&<div style={{background:"linear-gradient(135deg,#0F4C81,#1565C0)",borderRadius:16,padding:"24px 28px",color: `var(--bg-card)`,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
@@ -728,6 +793,11 @@ export default function App(){
           <h2 style={{margin:"0 0 16px",fontSize:20,fontWeight:800}}>🗺️ Hospitals on Map</h2>
           {hospitals.length>0&&<RealMap hospitals={hospitals.slice(0,10)} onSelect={h=>go("detail",h)}/>}
           <div style={{textAlign:"center",marginTop:12,marginBottom:24}}><button onClick={()=>go("map")} style={btn({background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,padding:"12px 28px"})}>Open Full Map View →</button></div>
+
+          <div style={{background: `var(--bg-card)`,borderRadius:16,padding:"24px 28px",color: `var(--text-primary)`,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,border:"1px solid #E5E7EB",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
+            <div><div style={{fontWeight:800,fontSize:18,marginBottom:6}}>🩺 Browse 100+ Specialists</div><div style={{opacity:0.7,fontSize:14}}>Find and book top-rated doctors across all medical fields</div></div>
+            <button onClick={()=>go("doctors")} style={btn({background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,padding:"12px 24px"})}>Find Doctors →</button>
+          </div>
 
           <div style={{background:"linear-gradient(135deg,#1B5E20,#388E3C)",borderRadius:16,padding:"24px 28px",color: `var(--bg-card)`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div><div style={{fontWeight:800,fontSize:18,marginBottom:6}}>💊 Compare Test Prices</div><div style={{opacity:0.85,fontSize:14}}>Find the most affordable test across hospitals</div></div>
@@ -1217,7 +1287,43 @@ export default function App(){
           </div>}
         </div>}
 
-        {/* =========== 🛡️ ADMIN DASHBOARD =========== */}
+        {/* =========== 👨‍⚕️ DOCTOR DASHBOARD =========== */}
+        {view==="doctor-dash"&&isDoctor&&<div style={{paddingBottom:40}}>
+          <div style={{background:"linear-gradient(135deg,#064E3B,#065F46)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.1}}>👨‍⚕️</div>
+            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:10,textTransform:"uppercase"}}>Specialist Portal</div>
+            <h1 style={{margin:"0 0 10px",fontSize:32,fontWeight:900}}>Welcome back, Doctor</h1>
+            <p style={{margin:0,opacity:0.85,fontSize:15}}>Manage your consultations, view medical histories, and start telemedicine calls.</p>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:32}}>
+            {[["Today's Appts",myAppointments.filter(a=>a.date==="Today").length,"📅","#059669"],["Total Consults",myAppointments.length,"📋","#0F4C81"],["Rating","4.9/5","⭐","#F59E0B"]].map(([l,v,i,c])=><div key={l} style={{background: `var(--bg-card)`,borderRadius:16,padding:"24px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",textAlign:"center"}}><div style={{fontSize:32,marginBottom:8}}>{i}</div><div style={{fontSize:28,fontWeight:900,color:c}}>{v}</div><div style={{fontSize:13,color: `var(--text-muted)`,fontWeight:600}}>{l}</div></div>)}
+          </div>
+
+          <h2 style={{fontSize:22,fontWeight:800,marginBottom:16}}>Upcoming Consultations</h2>
+          {myAppointments.length===0?(
+            <div style={{textAlign:"center",padding:60,background: `var(--bg-card)`,borderRadius:16}}><div style={{fontSize:48,marginBottom:12}}>📅</div><div style={{fontWeight:700,color: `var(--text-muted)`}}>No appointments scheduled.</div></div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              {myAppointments.map(apt=>(
+                <div key={apt.id} style={{background: `var(--bg-card)`,borderRadius:16,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{display:"flex",gap:20,alignItems:"center"}}>
+                    <div style={{width:50,height:50,borderRadius:"50%",background:"#F1F5F9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>👤</div>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:17}}>Patient: {apt.patientName}</div>
+                      <div style={{fontSize:13,color: `var(--text-muted)`}}>🕒 {apt.time} · {apt.date} · Age: {apt.patientAge}</div>
+                      <div style={{fontSize:12,color: "#0F4C81",fontWeight:700,marginTop:4}}>Reason: {apt.reason}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:12}}>
+                    <button onClick={()=>setCallRoom(apt.id)} style={btn({background:"#059669",color:"white",padding:"10px 20px"})}>📹 Join Call</button>
+                    <button onClick={()=>{notifShow("Searching health history..."); fetchHealthHistory(); go("health-history");}} style={btn({background:"white",color:"#0F4C81",border:"1px solid #0F4C81",padding:"10px 20px"})}>📋 View Records</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>}
         {view==="admin"&&isAdmin&&<div>
           <div style={{background:"linear-gradient(135deg,#111827,#374151)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
             <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.04}}>🛡️</div>
@@ -1256,6 +1362,83 @@ export default function App(){
           </div>}
         </div>}
 
+        {/* =========== 👨‍⚕️ DOCTOR DISCOVERY VIEW =========== */}
+        {view==="doctors"&&<div>
+          <div style={{background:"linear-gradient(135deg,#0F4C81,#1E88E5)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.1}}>👨‍⚕️</div>
+            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:10,textTransform:"uppercase"}}>Doctor Discovery</div>
+            <h1 style={{margin:"0 0 10px",fontSize:32,fontWeight:900}}>Find Top Specialists</h1>
+            <p style={{margin:0,opacity:0.85,fontSize:15}}>Browse over 100+ verified doctors across India's leading hospitals.</p>
+          </div>
+
+          <div style={{background: `var(--bg-card)`,borderRadius:14,padding:18,marginBottom:24,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
+            <div style={{flex:1,minWidth:200,position:"relative"}}><span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>🔍</span><input value={docSearch} onChange={e=>setDocSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&fetchAllDoctors()} placeholder="Search doctors by name or specialty..." style={{...inp,paddingLeft:36}}/></div>
+            <select value={docSpecFilter} onChange={e=>{setDocSpecFilter(e.target.value);}} style={{padding:"12px 16px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,background: `var(--bg-card)`,cursor:"pointer",fontFamily:"inherit"}}>{SPECIALITIES.map(sp=><option key={sp}>{sp}</option>)}</select>
+            <button onClick={fetchAllDoctors} style={btn({background:"#0F4C81",color:"white",padding:"12px 24px"})}>Search</button>
+            <div style={{height:30,width:1,background:"#E5E7EB",margin:"0 4px"}}></div>
+            <button onClick={()=>setDocMapView(!docMapView)} style={btn({background:docMapView?"#F59E0B":"#F1F5F9",color:docMapView?"white":"#475569",border:docMapView?"none":"1px solid #E5E7EB"})}>{docMapView?"📋 Show List":"🗺️ Show Map"}</button>
+          </div>
+
+          {loadingAllDocs && <div style={{textAlign:"center",padding:60}}><div style={{fontSize:40,marginBottom:12}}>🔍</div><div style={{fontWeight:700,color:"#0F4C81"}}>Searching doctors...</div></div>}
+
+          {!loadingAllDocs && docMapView && (
+            <div style={{borderRadius:20,overflow:"hidden",boxShadow:"0 10px 30px rgba(0,0,0,0.1)",border:"1px solid #E5E7EB",height:600}}>
+              <MapContainer center={[allDoctors[0]?.lat||28.6139, allDoctors[0]?.lng||77.209]} zoom={11} style={{height:"100%",width:"100%"}}>
+                <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                {allDoctors.map((d,i)=>(
+                  <Marker key={i} position={[d.lat, d.lng]}>
+                    <Popup>
+                      <div style={{fontFamily:"sans-serif",minWidth:180}}>
+                        <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
+                          <div style={{fontSize:24}}>{d.img}</div>
+                          <div>
+                            <div style={{fontWeight:800,fontSize:14}}>{d.name}</div>
+                            <div style={{fontSize:12,color:"#1E88E5",fontWeight:700}}>{d.spec}</div>
+                          </div>
+                        </div>
+                        <div style={{fontSize:12,color: `var(--text-muted)`,marginBottom:8}}>🏥 {d.hospitalName}</div>
+                        <div style={{fontSize:13,marginBottom:10}}>⭐ {d.rating} · 🎓 {d.exp} yrs exp</div>
+                        <button onClick={()=>{setBookingDoctor(d); setSelectedHospital({id: Math.floor(d.id/1000), name: d.hospitalName});}} style={{width:"100%",background:"#0F4C81",color:"white",padding:"8px",borderRadius:8,border:"none",fontWeight:700,cursor:"pointer"}}>Book Appointment</button>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+            </div>
+          )}
+
+          {!loadingAllDocs && !docMapView && (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))",gap:20}}>
+              {allDoctors.map((d,i)=>(
+                <div key={i} style={{background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",padding:24,display:"flex",gap:20,alignItems:"start",border:"1px solid #F1F5F9",transition:"transform 0.2s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-4px)"} onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
+                  <div style={{width:64,height:64,borderRadius:"50%",background:"#EFF6FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0}}>{d.img}</div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:4}}>
+                      <div style={{fontWeight:800,fontSize:18}}>{d.name}</div>
+                      <div style={{fontWeight:800,color:"#15803D"}}>₹{d.fee}</div>
+                    </div>
+                    <div style={{fontWeight:700,color:"#1E88E5",fontSize:13,marginBottom:8}}>{d.spec}</div>
+                    <div style={{fontSize:12,color: `var(--text-muted)`,marginBottom:12,display:"flex",alignItems:"center",gap:6}}><span>🏥 {d.hospitalName}</span></div>
+                    <div style={{display:"flex",gap:12,marginBottom:16}}>
+                      <div style={{background:"#F8FAFC",padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:600,color: `var(--text-secondary)`}}>🎓 {d.exp} Years Exp</div>
+                      <div style={{background:"#FFFBEB",padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:600,color:"#D97706"}}>⭐ {d.rating}</div>
+                    </div>
+                    <button onClick={()=>{setBookingDoctor(d); setSelectedHospital({id: Math.floor(d.id/1000), name: d.hospitalName, color: COLORS[i % COLORS.length]});}} style={{width:"100%",padding:"10px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,fontWeight:700,fontSize:13,cursor:"pointer"}}>Book Consultation</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {!loadingAllDocs && allDoctors.length === 0 && (
+            <div style={{textAlign:"center",padding:80,background: `var(--bg-card)`,borderRadius:20}}>
+              <div style={{fontSize:64,marginBottom:16}}>🔬</div>
+              <div style={{fontSize:20,fontWeight:800}}>No Doctors Found</div>
+              <div style={{color: `var(--text-muted)`}}>Try searching for a different specialty or keyword.</div>
+            </div>
+          )}
+        </div>}
+
       </div>
 
       {/* =========== 📹 TELEMEDICINE OVERLAY =========== */}
@@ -1286,7 +1469,7 @@ export default function App(){
             </div>
             <div>
               <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Quick Links</div>
-              {[["🏥 Hospitals","list"],["🧪 Compare Tests","compare"],["🗺️ Map View","map"],["💡 Health Tips","tips"]].map(([l,v])=><div key={v} onClick={()=>go(v)} style={{fontSize:13,opacity:0.7,marginBottom:8,cursor:"pointer"}}>{l}</div>)}
+              {[["🏥 Hospitals","list"],["👨‍⚕️ Find Doctors","doctors"],["🧪 Compare Tests","compare"],["🗺️ Map View","map"],["💡 Health Tips","tips"]].map(([l,v])=><div key={v} onClick={()=>{go(v); if(v==="doctors") fetchAllDoctors();}} style={{fontSize:13,opacity:0.7,marginBottom:8,cursor:"pointer"}}>{l}</div>)}
             </div>
             <div>
               <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Emergency</div>
