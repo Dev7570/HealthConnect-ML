@@ -581,7 +581,14 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 > *"Building the future of healthcare, one line of code at a time."*
 
-`Full-Stack Development` · `System Architecture` · `ML Integration` · `Cloud Deployment`
+🚀 Architected and developed the **HealthConnect Core Platform**:
+- 🌐 Built the **Full-Stack Web App** (React, Node.js, Express, Firebase)
+- 🗺️ Integrated **Live Hospital Data & Real-time Maps** (Google Places, Leaflet)
+- 💳 Crafted the **End-to-End Booking & Payment System**
+- 📹 Delivered **Telemedicine Video Consultations** (WebRTC)
+- 🛡️ Designed the UI/UX, Admin Analytics, and Data Models
+
+`Full-Stack Architecture` · `API Engineering` · `Telemedicine` · `Cloud Deployment`
 
 </td>
 <td align="center" width="50%">
