@@ -46,3 +46,6 @@ dist/
 ehthumbs.db
 Thumbs.db
 *.ipynb
+
+.vercel
+.env*.local
