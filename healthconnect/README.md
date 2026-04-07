@@ -558,15 +558,58 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ---
 
-## 👨‍💻 Author
+## 👥 Meet the Team
 
 <div align="center">
 
-<img src="https://img.shields.io/badge/Built%20with%20❤️%20by-Dev%20Gupta-0F4C81?style=for-the-badge&labelColor=1565C0" alt="Author"/>
+<table>
+<tr>
+<td align="center" width="50%">
+
+### 👨‍💻 Dev Gupta
+**Founder & Lead Developer**
+
+<br/>
+
+<img src="https://img.shields.io/badge/🚀_FOUNDER-DEV%20GUPTA-0F4C81?style=for-the-badge&labelColor=1565C0" alt="Dev Gupta"/>
 
 <br/><br/>
 
 [![GitHub](https://img.shields.io/badge/GitHub-Dev7570-181717?style=for-the-badge&logo=github)](https://github.com/Dev7570)
+
+<br/>
+
+> *"Building the future of healthcare, one line of code at a time."*
+
+`Full-Stack Development` · `System Architecture` · `ML Integration` · `Cloud Deployment`
+
+</td>
+<td align="center" width="50%">
+
+### 👩‍💻 Aradhya Srivastava
+**Co-Founder & Developer**
+
+<br/>
+
+<img src="https://img.shields.io/badge/🤝_CO--FOUNDER-ARADHYA%20SRIVASTAVA-7C3AED?style=for-the-badge&labelColor=6D28D9" alt="Aradhya Srivastava"/>
+
+<br/><br/>
+
+![Role](https://img.shields.io/badge/Role-Co--Founder%20%26%20Developer-6D28D9?style=for-the-badge&labelColor=1a1a2e)
+
+<br/>
+
+> *"Transforming ideas into impactful digital health solutions."*
+
+`Feature Development` · `UI/UX Design` · `Backend APIs` · `Testing & QA`
+
+</td>
+</tr>
+</table>
+
+<br/>
+
+<img src="https://img.shields.io/badge/Built%20with%20❤️%20by-Dev%20Gupta%20%26%20Aradhya%20Srivastava-0F4C81?style=for-the-badge&labelColor=1565C0" alt="Team"/>
 
 </div>
 
