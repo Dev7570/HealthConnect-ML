@@ -12,4 +12,4 @@ COPY app.py .
 
 EXPOSE 5001
 
-CMD ["gunicorn", "--workers", "2", "--threads", "2", "--timeout", "120", "-b", "0.0.0.0:5001", "app:app"]
+CMD gunicorn --workers 2 --threads 2 --timeout 120 -b 0.0.0.0:${PORT:-5001} app:app
