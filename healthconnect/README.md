@@ -23,9 +23,9 @@
 <br/>
 
 <!-- GitHub Stats Badges -->
-![Stars](https://img.shields.io/github/stars/DevGupta7570/HealthConnect-ML?style=for-the-badge&color=F59E0B&labelColor=1a1a2e)
-![Forks](https://img.shields.io/github/forks/DevGupta7570/HealthConnect-ML?style=for-the-badge&color=1E88E5&labelColor=1a1a2e)
-![Issues](https://img.shields.io/github/issues/DevGupta7570/HealthConnect-ML?style=for-the-badge&color=EF4444&labelColor=1a1a2e)
+![Stars](https://img.shields.io/github/stars/Dev7570/HealthConnect-ML?style=for-the-badge&color=F59E0B&labelColor=1a1a2e)
+![Forks](https://img.shields.io/github/forks/Dev7570/HealthConnect-ML?style=for-the-badge&color=1E88E5&labelColor=1a1a2e)
+![Issues](https://img.shields.io/github/issues/Dev7570/HealthConnect-ML?style=for-the-badge&color=EF4444&labelColor=1a1a2e)
 ![License](https://img.shields.io/badge/License-MIT-059669?style=for-the-badge&labelColor=1a1a2e)
 
 <br/>
@@ -288,7 +288,7 @@ python >= 3.9
 
 ```bash
 # Clone the repository
-git clone https://github.com/DevGupta7570/HealthConnect-ML.git
+git clone https://github.com/Dev7570/HealthConnect-ML.git
 cd HealthConnect-ML/healthconnect
 
 # Install dependencies
@@ -566,7 +566,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <br/><br/>
 
-[![GitHub](https://img.shields.io/badge/GitHub-DevGupta7570-181717?style=for-the-badge&logo=github)](https://github.com/DevGupta7570)
+[![GitHub](https://img.shields.io/badge/GitHub-Dev7570-181717?style=for-the-badge&logo=github)](https://github.com/Dev7570)
 
 </div>
 
