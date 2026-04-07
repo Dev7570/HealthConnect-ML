@@ -587,7 +587,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 <td align="center" width="50%">
 
 ### 👩‍💻 Aradhya Srivastava
-**Co-Founder & Developer**
+**Co-Founder & AI/ML Developer**
 
 <br/>
 
@@ -595,13 +595,19 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <br/><br/>
 
-![Role](https://img.shields.io/badge/Role-Co--Founder%20%26%20Developer-6D28D9?style=for-the-badge&labelColor=1a1a2e)
+![Role](https://img.shields.io/badge/Role-Co--Founder%20%26%20AI%2FML%20Developer-6D28D9?style=for-the-badge&labelColor=1a1a2e)
 
 <br/>
 
-> *"Transforming ideas into impactful digital health solutions."*
+> *"Powering healthcare with intelligent AI — from chatbot to disease prediction."*
 
-`Feature Development` · `UI/UX Design` · `Backend APIs` · `Testing & QA`
+🧠 Developed the entire **HealthConnect ML** ecosystem:
+- 🤖 Built the **AI Chatbot** (symptom-based doctor recommendations)
+- ❤️ Integrated **AI Prediction Engine** (Heart, Cancer, Diabetes models)
+- 🔬 Trained & deployed **ML models** with Scikit-learn & Flask
+- 📊 Designed **health history tracking** & prediction analytics
+
+`AI/ML Development` · `Chatbot Integration` · `Predictive Analytics` · `Python Flask`
 
 </td>
 </tr>
