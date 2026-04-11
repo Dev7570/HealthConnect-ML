@@ -1,36 +1,155 @@
+/* ============================================================
+   PULSERATE — Professional Healthcare Design System
+   Clean · Trustworthy · Modern
+   ============================================================ */
+
 :root {
-  --bg-main: #F1F5F9;
-  --bg-card: #FFFFFF;
-  --bg-card-hover: #F9FAFB;
+  /* Primary Palette */
+  --primary: #2563eb;
+  --primary-light: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+
+  /* Accent */
+  --accent: #0d9488;
+  --accent-light: #14b8a6;
+
+  /* Semantic */
+  --success: #059669;
+  --success-light: #d1fae5;
+  --warning: #d97706;
+  --warning-light: #fef3c7;
+  --danger: #dc2626;
+  --danger-light: #fee2e2;
+  --info: #2563eb;
+
+  /* Background (Light) */
+  --bg-body: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafbfc;
+  --bg-surface: #f1f5f9;
+  --bg-elevated: #ffffff;
+
+  /* Text */
   --text-primary: #111827;
   --text-secondary: #374151;
-  --text-muted: #6B7280;
-  --border-light: #E5E7EB;
+  --text-muted: #6b7280;
+  --text-inverse: #ffffff;
+
+  /* Border */
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+
+  /* Shadow */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.07), 0 4px 6px -4px rgba(0,0,0,0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+
+  /* Transition */
+  --transition: 0.2s ease;
+  --transition-slow: 0.35s ease;
+
+  /* Typography */
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Navbar height for offset */
+  --navbar-h: 60px;
 }
 
+/* ─── Dark Mode ─── */
 [data-theme='dark'] {
-  --bg-main: #0B0F19;           /* Very deep blue/black */
-  --bg-card: #151B2B;           /* Slightly lighter blue/gray */
-  --bg-card-hover: #1C2333;
-  --text-primary: #F3F4F6;
-  --text-secondary: #D1D5DB;
-  --text-muted: #9CA3AF;
-  --border-light: #1F2937;
+  --bg-body: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-hover: #253348;
+  --bg-surface: #172033;
+  --bg-elevated: #1e293b;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+
+  --border: #334155;
+  --border-light: #1e293b;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.25);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.25);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.3);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.35);
 }
+
+/* ─── Base ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body);
+  background: var(--bg-body);
+  color: var(--text-primary);
+  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-main);
-  color: var(--text-primary);
+  line-height: 1.6;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+::selection { background: rgba(37, 99, 235, 0.2); }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+[data-theme='dark'] ::-webkit-scrollbar-thumb { background: #334155; }
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+a { text-decoration: none; color: inherit; }
+
+select, input, textarea, button { font-family: var(--font-body); }
+
+/* ─── Animations ─── */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeInDown { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes float { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-8px); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100%{ opacity: 1; } 50%{ opacity: 0.5; } }
+
+@keyframes blink { 0%,100%{ opacity: 1; } 50%{ opacity: 0; } }
+
+@keyframes ecgDraw {
+  0% { stroke-dashoffset: 600; }
+  100% { stroke-dashoffset: 0; }
 }
+
+@keyframes heartbeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.15); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.08); }
+  70% { transform: scale(1); }
+}
+
+@keyframes loaderFade {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+/* Leaflet */
+.leaflet-container { border-radius: var(--radius-lg) !important; }

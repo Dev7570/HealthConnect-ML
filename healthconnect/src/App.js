@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -13,6 +13,7 @@ import {
 } from "firebase/auth";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import "./App.css";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -21,9 +22,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-// 🎨 Color palette for hospitals
-const COLORS = ["#0066CC","#E8432D","#00A651","#6B21A8","#F59E0B","#0F766E","#DC2626","#7C3AED","#059669","#D97706"];
-
+const COLORS = ["#2563eb","#7c3aed","#059669","#d97706","#dc2626","#0d9488","#6366f1","#ea580c","#0891b2","#be185d"];
 const ALL_TESTS = ["Blood Test (CBC)","MRI Brain","CT Scan Chest","ECG","X-Ray","Lipid Profile"];
 const SPECIALITIES = [
   "All","Cardiology","Neurology","Orthopedics","Oncology","Pediatrics",
@@ -33,78 +32,167 @@ const SPECIALITIES = [
 ];
 const TIME_SLOTS = ["9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM"];
 
-// 🏥 Health Tips Data
 const HEALTH_TIPS = [
-  { id: 1, category: "Prevention", icon: "🛡️", color: "#059669", title: "Regular Health Checkups", desc: "Get a full body checkup at least once a year. Early detection can prevent serious health issues. Blood tests, ECG, and basic screenings should be part of your annual routine.", tip: "Schedule your next checkup today!" },
-  { id: 2, category: "Nutrition", icon: "🥗", color: "#D97706", title: "Balanced Diet is Key", desc: "Include plenty of fruits, vegetables, whole grains, and lean proteins in your diet. Limit processed foods, sugar, and excessive salt for better heart and digestive health.", tip: "Try adding one new vegetable to your diet this week!" },
-  { id: 3, category: "Mental Health", icon: "🧠", color: "#7C3AED", title: "Prioritize Mental Wellness", desc: "Mental health is just as important as physical health. Practice meditation, deep breathing, or yoga daily. Don't hesitate to seek professional help if you feel overwhelmed.", tip: "Start with just 5 minutes of meditation today." },
-  { id: 4, category: "First Aid", icon: "🩹", color: "#DC2626", title: "Basic First Aid Knowledge", desc: "Everyone should know basic first aid — CPR, treating burns, stopping bleeding, and handling choking emergencies. These skills can save lives in critical moments.", tip: "Take a free first aid course online!" },
-  { id: 5, category: "Fitness", icon: "🏃", color: "#0284C7", title: "Stay Physically Active", desc: "Aim for at least 30 minutes of moderate exercise daily. Walking, jogging, cycling, or swimming can significantly reduce the risk of heart disease, diabetes, and obesity.", tip: "A 30-min walk daily can add years to your life!" },
-  { id: 6, category: "Hygiene", icon: "🧼", color: "#0F766E", title: "Maintain Good Hygiene", desc: "Wash hands frequently, maintain oral hygiene, and keep your living environment clean. Good hygiene prevents infections and keeps you healthy throughout the year.", tip: "Wash hands for at least 20 seconds!" },
-  { id: 7, category: "Sleep", icon: "😴", color: "#4338CA", title: "Quality Sleep Matters", desc: "Adults need 7-9 hours of quality sleep per night. Poor sleep increases the risk of heart disease, obesity, and mental health issues. Maintain a consistent sleep schedule.", tip: "Put away screens 1 hour before bed." },
-  { id: 8, category: "Hydration", icon: "💧", color: "#0891B2", title: "Drink Enough Water", desc: "Stay hydrated by drinking at least 8 glasses (2 liters) of water daily. Proper hydration improves digestion, skin health, energy levels, and kidney function.", tip: "Carry a water bottle everywhere you go!" },
+  { id:1, category:"Prevention", icon:"🛡️", color:"#059669", title:"Regular Health Checkups", desc:"Get a full body checkup at least once a year. Early detection can prevent serious health issues.", tip:"Schedule your next checkup today!" },
+  { id:2, category:"Nutrition", icon:"🥗", color:"#d97706", title:"Balanced Diet is Key", desc:"Include plenty of fruits, vegetables, whole grains, and lean proteins. Limit processed foods and excessive sugar.", tip:"Try adding one new vegetable this week!" },
+  { id:3, category:"Mental Health", icon:"🧠", color:"#7c3aed", title:"Prioritize Mental Wellness", desc:"Practice meditation, deep breathing, or yoga daily. Don't hesitate to seek professional help if needed.", tip:"Start with 5 minutes of meditation today." },
+  { id:4, category:"First Aid", icon:"🩹", color:"#dc2626", title:"Basic First Aid Knowledge", desc:"Everyone should know CPR, treating burns, stopping bleeding, and handling choking emergencies.", tip:"Take a free first aid course online!" },
+  { id:5, category:"Fitness", icon:"🏃", color:"#2563eb", title:"Stay Physically Active", desc:"Aim for at least 30 minutes of moderate exercise daily. Walking, jogging, or swimming reduces disease risk.", tip:"A 30-min walk daily adds years to your life!" },
+  { id:6, category:"Hygiene", icon:"🧼", color:"#0891b2", title:"Maintain Good Hygiene", desc:"Wash hands frequently, maintain oral hygiene, and keep your living environment clean.", tip:"Wash hands for at least 20 seconds!" },
+  { id:7, category:"Sleep", icon:"😴", color:"#6366f1", title:"Quality Sleep Matters", desc:"Adults need 7-9 hours of quality sleep per night. Poor sleep increases risk of heart disease and obesity.", tip:"Put away screens 1 hour before bed." },
+  { id:8, category:"Hydration", icon:"💧", color:"#0d9488", title:"Drink Enough Water", desc:"Stay hydrated — at least 8 glasses (2 liters) daily. Hydration improves digestion, skin, and energy.", tip:"Carry a water bottle everywhere!" },
 ];
 
-// 🚨 Emergency Numbers
 const EMERGENCY_CONTACTS = [
-  { name: "Ambulance", number: "102", icon: "🚑", color: "#DC2626", desc: "Medical Emergency — Free ambulance service" },
-  { name: "Police", number: "100", icon: "👮", color: "#1D4ED8", desc: "Law enforcement assistance" },
-  { name: "Fire Brigade", number: "101", icon: "🚒", color: "#EA580C", desc: "Fire & rescue services" },
-  { name: "Women Helpline", number: "1091", icon: "👩", color: "#9333EA", desc: "24/7 Women safety helpline" },
-  { name: "Child Helpline", number: "1098", icon: "👶", color: "#0D9488", desc: "Child protection & emergency" },
-  { name: "Emergency (Universal)", number: "112", icon: "🆘", color: "#BE123C", desc: "Universal emergency number — works everywhere" },
-  { name: "Mental Health", number: "08046110007", icon: "🧠", color: "#7C3AED", desc: "NIMHANS mental health helpline" },
-  { name: "COVID Helpline", number: "1075", icon: "😷", color: "#059669", desc: "Health ministry COVID helpline" },
+  { name:"Ambulance", number:"102", icon:"🚑", color:"#dc2626", desc:"Medical Emergency — Free ambulance" },
+  { name:"Police", number:"100", icon:"👮", color:"#6366f1", desc:"Law enforcement assistance" },
+  { name:"Fire Brigade", number:"101", icon:"🚒", color:"#ea580c", desc:"Fire & rescue services" },
+  { name:"Women Helpline", number:"1091", icon:"👩", color:"#7c3aed", desc:"24/7 women safety helpline" },
+  { name:"Child Helpline", number:"1098", icon:"👶", color:"#0891b2", desc:"Child protection & emergency" },
+  { name:"Emergency", number:"112", icon:"🆘", color:"#be185d", desc:"Universal emergency — works everywhere" },
+  { name:"Mental Health", number:"08046110007", icon:"🧠", color:"#6366f1", desc:"NIMHANS mental health helpline" },
+  { name:"COVID Helpline", number:"1075", icon:"😷", color:"#059669", desc:"Health ministry COVID helpline" },
 ];
 
-const Star = ({rating,size=14}) => <span>{[1,2,3,4,5].map(s=><span key={s} style={{fontSize:size,color:s<=Math.round(rating)?"#F59E0B":"#D1D5DB"}}>★</span>)}</span>;
-const Badge = ({children,color="#EFF6FF",text="#1D4ED8"}) => <span style={{background:color,color:text,fontSize:11,fontWeight:600,padding:"2px 10px",borderRadius:20,whiteSpace:"nowrap"}}>{children}</span>;
+const API_URL = process.env.REACT_APP_API_URL || "https://healthconnect-backend-pcun.onrender.com";
 
-function RealMap({hospitals,onSelect}){
-  // India-wide center by default
+/* ═══════════════════════════════════════
+   UTILITY COMPONENTS
+   ═══════════════════════════════════════ */
+
+/* Typing animation hook */
+function useTyping(phrases, typeSpeed = 80, deleteSpeed = 40, pause = 2000) {
+  const [text, setText] = useState("");
+  const [phraseIdx, setPhraseIdx] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const current = phrases[phraseIdx];
+    let timer;
+
+    if (!isDeleting && text === current) {
+      timer = setTimeout(() => setIsDeleting(true), pause);
+    } else if (isDeleting && text === "") {
+      setIsDeleting(false);
+      setPhraseIdx((prev) => (prev + 1) % phrases.length);
+    } else {
+      timer = setTimeout(() => {
+        setText(
+          isDeleting
+            ? current.substring(0, text.length - 1)
+            : current.substring(0, text.length + 1)
+        );
+      }, isDeleting ? deleteSpeed : typeSpeed);
+    }
+    return () => clearTimeout(timer);
+  }, [text, phraseIdx, isDeleting, phrases, typeSpeed, deleteSpeed, pause]);
+
+  return text;
+}
+
+/* Animated counter */
+function AnimCounter({ target, duration = 1500, suffix = "" }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !started.current) {
+          started.current = true;
+          const num = parseInt(target, 10);
+          if (isNaN(num)) { setCount(target); return; }
+          const start = performance.now();
+          const step = (now) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setCount(Math.floor(eased * num));
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [target, duration]);
+
+  return <span ref={ref}>{count}{suffix}</span>;
+}
+
+/* Star rating */
+const Stars = ({ rating, size = 14 }) => (
+  <span>
+    {[1, 2, 3, 4, 5].map((s) => (
+      <span key={s} style={{ fontSize: size, color: s <= Math.round(rating) ? "#f59e0b" : "#d1d5db" }}>★</span>
+    ))}
+  </span>
+);
+
+/* Badge */
+const Badge = ({ children, color = "gray" }) => (
+  <span className={`badge badge-${color}`}>{children}</span>
+);
+
+/* Loading Screen */
+function LoaderScreen({ visible }) {
+  return (
+    <div className={`loader-screen ${visible ? "" : "hide"}`}>
+      <div className="loader-logo">Pulse<span>RATE</span></div>
+      <div className="loader-sub">AI-Powered Healthcare</div>
+      <svg className="loader-ecg" viewBox="0 0 200 50">
+        <path d="M0,25 L30,25 L40,10 L50,40 L60,5 L70,45 L80,25 L110,25 L120,15 L130,35 L140,20 L150,30 L160,25 L200,25" />
+      </svg>
+    </div>
+  );
+}
+
+/* ═══ MAP ═══ */
+function RealMap({ hospitals, onSelect }) {
   const center = hospitals.length > 0
     ? [hospitals[0].lat || 28.6139, hospitals[0].lng || 77.209]
     : [20.5937, 78.9629];
-
   const CITY_PINS = [
-    { name: "Delhi",     lat: 28.6139, lng: 77.2090 },
-    { name: "Mumbai",    lat: 19.0760, lng: 72.8777 },
+    { name: "Delhi", lat: 28.6139, lng: 77.209 },
+    { name: "Mumbai", lat: 19.076, lng: 72.8777 },
     { name: "Bangalore", lat: 12.9716, lng: 77.5946 },
-    { name: "Chennai",   lat: 13.0827, lng: 80.2707 },
-    { name: "Hyderabad", lat: 17.3850, lng: 78.4867 },
-    { name: "Pune",      lat: 18.5204, lng: 73.8567 },
-    { name: "Kolkata",   lat: 22.5726, lng: 88.3639 },
+    { name: "Chennai", lat: 13.0827, lng: 80.2707 },
+    { name: "Hyderabad", lat: 17.385, lng: 78.4867 },
+    { name: "Pune", lat: 18.5204, lng: 73.8567 },
+    { name: "Kolkata", lat: 22.5726, lng: 88.3639 },
     { name: "Ahmedabad", lat: 23.0225, lng: 72.5714 },
   ];
 
-  return(
-    <div style={{borderRadius:16,overflow:"hidden",height: hospitals.length > 0 ? 420 : 600, border:"1px solid #CBD5E1"}}>
-      <MapContainer center={center} zoom={hospitals.length > 0 ? 11 : 5} style={{height:"100%",width:"100%"}}>
-        <TileLayer 
-          attribution='&copy; <a href="https://carto.com/">CartoDB</a>' 
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+  return (
+    <div style={{ borderRadius: 14, overflow: "hidden", height: hospitals.length > 0 ? 400 : 550, border: "1px solid var(--border)" }}>
+      <MapContainer center={center} zoom={hospitals.length > 0 ? 11 : 5} style={{ height: "100%", width: "100%" }}>
+        <TileLayer
+          attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
-        {hospitals.map((h,i)=>(
+        {hospitals.map((h) => (
           <Marker key={h.id} position={[h.lat || 28.6139, h.lng || 77.209]}>
             <Popup>
-              <div style={{fontFamily:"sans-serif",minWidth:180}}>
-                <div style={{fontWeight:800,fontSize:14,marginBottom:4}}>{h.name}</div>
-                <div style={{fontSize:12,color: `var(--text-muted)`,marginBottom:6}}>📍 {h.address}</div>
-                <div style={{fontSize:13,marginBottom:8}}>⭐ {h.rating} · {h.reviews.toLocaleString()} reviews</div>
-                <div style={{display:"flex",gap:6}}>
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}`} target="_blank" rel="noreferrer" style={{background:"#1E88E5",color: `var(--bg-card)`,padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,textDecoration:"none"}}>🗺️ Directions</a>
-                  <button onClick={()=>onSelect(h)} style={{background:h.color,color: `var(--bg-card)`,padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,border:"none",cursor:"pointer"}}>View</button>
+              <div style={{ fontFamily: "var(--font-body)", minWidth: 180 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{h.name}</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>📍 {h.address}</div>
+                <div style={{ fontSize: 13, marginBottom: 8 }}>⭐ {h.rating} · {h.reviews.toLocaleString()} reviews</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}`} target="_blank" rel="noreferrer"
+                    style={{ background: "#2563eb", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Directions</a>
+                  <button onClick={() => onSelect(h)} style={{ background: "#059669", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}>View</button>
                 </div>
               </div>
             </Popup>
           </Marker>
         ))}
-        {hospitals.length === 0 && CITY_PINS.map((city) => (
-          <Marker key={city.name} position={[city.lat, city.lng]}>
-            <Popup>
-              <strong>🏥 {city.name}</strong><br />
-              Search hospitals in {city.name}
-            </Popup>
+        {hospitals.length === 0 && CITY_PINS.map((c) => (
+          <Marker key={c.name} position={[c.lat, c.lng]}>
+            <Popup><strong>🏥 {c.name}</strong><br />Search hospitals in {c.name}</Popup>
           </Marker>
         ))}
       </MapContainer>
@@ -112,7 +200,8 @@ function RealMap({hospitals,onSelect}){
   );
 }
 
-function AuthPage({onSuccess}){
+/* ═══ AUTH ═══ */
+function AuthPage({ onSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -123,159 +212,179 @@ function AuthPage({onSuccess}){
   const handle = async () => {
     setError(""); setLoading(true);
     try {
-      if(isLogin){
+      if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        if(!name) { setError("Please enter your name"); setLoading(false); return; }
+        if (!name) { setError("Please enter your name"); setLoading(false); return; }
         const res = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(res.user, { displayName: name });
       }
       onSuccess();
-    } catch(e) {
-      if(e.code==="auth/email-already-in-use") setError("Email already registered. Please login.");
-      else if(e.code==="auth/wrong-password") setError("Wrong password. Try again.");
-      else if(e.code==="auth/user-not-found") setError("No account found. Please sign up.");
-      else if(e.code==="auth/weak-password") setError("Password must be at least 6 characters.");
-      else if(e.code==="auth/invalid-email") setError("Please enter a valid email.");
-      else setError("Something went wrong. Try again.");
+    } catch (e) {
+      const msgs = {
+        "auth/email-already-in-use": "Email already registered. Please login.",
+        "auth/wrong-password": "Wrong password. Try again.",
+        "auth/user-not-found": "No account found. Please sign up.",
+        "auth/weak-password": "Password must be at least 6 characters.",
+        "auth/invalid-email": "Please enter a valid email.",
+      };
+      setError(msgs[e.code] || "Something went wrong. Try again.");
     }
     setLoading(false);
   };
 
-  const inp = {width:"100%",padding:"12px 16px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,outline:"none",fontFamily:"inherit",boxSizing:"border-box",marginBottom:14};
-
-  return(
-    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0F4C81,#1565C0,#42A5F5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{background: `var(--bg-card)`,borderRadius:24,padding:40,width:"100%",maxWidth:420,boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <img src="/pulserate-logo.png?v=2" alt="PulseRATE Logo" style={{height: 72, marginBottom: 8}} />
-          <div style={{fontSize:14,color: `var(--text-muted)`,marginTop:4}}>{isLogin?"Welcome back! Please login.":"Create your account"}</div>
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-logo">
+          <img src="/pulserate-logo.png?v=2" alt="PulseRATE" />
+          <div className="auth-logo-text">Pulse<span className="rate">RATE</span></div>
+          <div className="auth-sub">{isLogin ? "Welcome back! Sign in to continue." : "Create your account to get started."}</div>
         </div>
-        {!isLogin && <input value={name} onChange={e=>setName(e.target.value)} placeholder="Full Name" style={inp}/>}
-        <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email Address" style={inp}/>
-        <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password (min 6 chars)" style={inp} onKeyDown={e=>e.key==="Enter"&&handle()}/>
-        {error && <div style={{background:"#FFF1F2",border:"1px solid #FECDD3",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#BE123C",marginBottom:14}}>❌ {error}</div>}
-        <button onClick={handle} disabled={loading} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:loading?"#94A3B8":"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,fontWeight:800,fontSize:16,cursor:loading?"not-allowed":"pointer",marginBottom:16}}>
-          {loading?"Please wait...":isLogin?"Login →":"Create Account →"}
+        {!isLogin && <input value={name} onChange={e => setName(e.target.value)} placeholder="Full Name" className="auth-input" />}
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email Address" className="auth-input" />
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (min 6 chars)" className="auth-input" onKeyDown={e => e.key === "Enter" && handle()} />
+        {error && <div className="auth-err">❌ {error}</div>}
+        <button onClick={handle} disabled={loading} className="auth-btn">
+          {loading ? "Please wait..." : isLogin ? "Sign In →" : "Create Account →"}
         </button>
-        <div style={{textAlign:"center",fontSize:14,color: `var(--text-muted)`}}>
-          {isLogin?"Don't have an account? ":"Already have an account? "}
-          <span onClick={()=>{setIsLogin(!isLogin);setError("");}} style={{color:"#1E88E5",fontWeight:700,cursor:"pointer"}}>{isLogin?"Sign Up":"Login"}</span>
+        <div className="auth-toggle">
+          {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <span className="auth-toggle-link" onClick={() => { setIsLogin(!isLogin); setError(""); }}>
+            {isLogin ? "Sign Up" : "Sign In"}
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-const API_URL = process.env.REACT_APP_API_URL || "https://healthconnect-backend-pcun.onrender.com";
-
-function BookingModal({doctor,hospital,user,onClose,onBooked}){
-  const [step,setStep]=useState(1);
-  const [date,setDate]=useState("Mon, 24 Feb");
-  const [slot,setSlot]=useState(null);
-  const [name,setName]=useState(user?.displayName||"");
-  const [age,setAge]=useState("");
-  const [phone,setPhone]=useState("");
-  const [reason,setReason]=useState("");
-  const [done,setDone]=useState(false);
-  const [bookingId,setBookingId]=useState("");
-  const [saving,setSaving]=useState(false);
-  const dates=["Mon, 24 Mar","Tue, 25 Mar","Wed, 26 Mar","Thu, 27 Mar","Fri, 28 Mar"];
-  const btn=(e={})=>({padding:"10px 20px",borderRadius:10,border:"none",fontWeight:700,cursor:"pointer",fontSize:14,...e});
+/* ═══ BOOKING MODAL ═══ */
+function BookingModal({ doctor, hospital, user, onClose, onBooked }) {
+  const [step, setStep] = useState(1);
+  const [date, setDate] = useState("Mon, 24 Mar");
+  const [slot, setSlot] = useState(null);
+  const [name, setName] = useState(user?.displayName || "");
+  const [age, setAge] = useState("");
+  const [phone, setPhone] = useState("");
+  const [reason, setReason] = useState("");
+  const [done, setDone] = useState(false);
+  const [bookingId, setBookingId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const dates = ["Mon, 24 Mar", "Tue, 25 Mar", "Wed, 26 Mar", "Thu, 27 Mar", "Fri, 28 Mar"];
 
   const confirmBooking = async () => {
     setSaving(true);
     try {
       const res = await fetch(`${API_URL}/appointments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doctorName: doctor.name,
-          doctorSpec: doctor.spec,
-          doctorEmail: doctor.email,
-          hospitalName: hospital.name,
-          hospitalId: hospital.id,
-          date,
-          time: slot,
-          patientName: name,
-          patientAge: age,
-          patientEmail: user?.email,
-          reason,
-          fee: doctor.fee
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorName: doctor.name, doctorSpec: doctor.spec, doctorEmail: doctor.email, hospitalName: hospital.name, hospitalId: hospital.id, date, time: slot, patientName: name, patientAge: age, patientEmail: user?.email, reason, fee: doctor.fee }),
       });
       const data = await res.json();
-      if (data.success) {
-        setBookingId(data.appointment.id);
-        setDone(true);
-        if (onBooked) onBooked();
-      }
-    } catch (err) {
-      // Fallback for demo if backend fails
+      if (data.success) { setBookingId(data.appointment.id); setDone(true); if (onBooked) onBooked(); }
+    } catch {
       setBookingId("HC" + Math.floor(Math.random() * 90000 + 10000));
-      setDone(true);
-      if (onBooked) onBooked();
+      setDone(true); if (onBooked) onBooked();
     }
     setSaving(false);
   };
 
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background: `var(--bg-card)`,borderRadius:20,width:"100%",maxWidth:480,maxHeight:"90vh",overflow:"auto",boxShadow:"0 25px 60px rgba(0,0,0,0.3)"}}>
-        <div style={{background:"linear-gradient(135deg,#0F4C81,#1E88E5)",padding:"20px 24px",borderRadius:"20px 20px 0 0",color: `var(--bg-card)`}}>
-          <div style={{display:"flex",justifyContent:"space-between"}}>
-            <div><div style={{fontSize:13,opacity:0.8,marginBottom:4}}>Booking Appointment</div><div style={{fontSize:18,fontWeight:700}}>{doctor.name}</div><div style={{fontSize:13,opacity:0.9}}>{doctor.spec} · {hospital.name}</div></div>
-            <button onClick={onClose} style={{background:"rgba(255,255,255,0.2)",border:"none",borderRadius:8,padding:"6px 10px",color: `var(--bg-card)`,cursor:"pointer",fontSize:18}}>✕</button>
+  return (
+    <div className="modal-bg" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <div className="modal-head">
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 3 }}>Booking Appointment</div>
+              <div style={{ fontSize: 17, fontWeight: 700 }}>{doctor.name}</div>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>{doctor.spec} · {hospital.name}</div>
+            </div>
+            <button className="modal-x" onClick={onClose}>✕</button>
           </div>
-          <div style={{display:"flex",gap:8,marginTop:16}}>
-            {[1,2,3,4].map(s=><div key={s} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:24,height:24,borderRadius:"50%",background:step>=s?"white":"rgba(255,255,255,0.3)",color:step>=s?"#1E88E5": `var(--bg-card)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{s}</div><span style={{fontSize:11,opacity:step>=s?1:0.6}}>{["Date & Time","Info","Pay","Confirm"][s-1]}</span>{s<4&&<span style={{opacity:0.4}}>›</span>}</div>)}
+          <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+            {[1, 2, 3, 4].map(s => (
+              <div key={s} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div className={`step-dot ${step >= s ? "on" : "off"}`}>{s}</div>
+                <span style={{ fontSize: 11, opacity: step >= s ? 1 : 0.5 }}>{["Date", "Info", "Pay", "Confirm"][s - 1]}</span>
+                {s < 4 && <span style={{ opacity: 0.3, margin: "0 2px" }}>›</span>}
+              </div>
+            ))}
           </div>
         </div>
-        <div style={{padding:24}}>
-          {!done?(
+        <div className="modal-body">
+          {!done ? (
             <>
-              {step===1&&<div>
-                <div style={{fontWeight:600,marginBottom:12}}>Select Date</div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>{dates.map(d=><button key={d} onClick={()=>setDate(d)} style={{padding:"8px 14px",borderRadius:10,border:date===d?"2px solid #1E88E5":"2px solid #E5E7EB",background:date===d?"#EFF6FF": `var(--bg-card)`,color:date===d?"#1E88E5": `var(--text-muted)`,fontWeight:600,fontSize:12,cursor:"pointer"}}>{d}</button>)}</div>
-                <div style={{fontWeight:600,marginBottom:12}}>Select Time Slot</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:24}}>{TIME_SLOTS.map(t=><button key={t} onClick={()=>setSlot(t)} style={{padding:"10px 6px",borderRadius:10,border:slot===t?"2px solid #1E88E5":"2px solid #E5E7EB",background:slot===t?"#EFF6FF": `var(--bg-card)`,color:slot===t?"#1E88E5": `var(--text-secondary)`,fontWeight:slot===t?700:400,fontSize:13,cursor:"pointer"}}>{t}</button>)}</div>
-                <button onClick={()=>slot&&setStep(2)} style={btn({width:"100%",padding:"14px",borderRadius:12,background:slot?"linear-gradient(135deg,#0F4C81,#1E88E5)": `var(--border-light)`,color:slot?"white": `var(--text-muted)`})}>Continue →</button>
+              {step === 1 && <div>
+                <div style={{ fontWeight: 700, marginBottom: 10 }}>Select Date</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+                  {dates.map(d => <button key={d} onClick={() => setDate(d)} className={`date-pill ${date === d ? "on" : ""}`}>{d}</button>)}
+                </div>
+                <div style={{ fontWeight: 700, marginBottom: 10 }}>Select Time</div>
+                <div className="time-grid">
+                  {TIME_SLOTS.map(t => <button key={t} onClick={() => setSlot(t)} className={`time-pill ${slot === t ? "on" : ""}`}>{t}</button>)}
+                </div>
+                <button onClick={() => slot && setStep(2)} className={`btn btn-lg ${slot ? "btn-primary" : "btn-outline"}`} style={{ width: "100%" }}>Continue →</button>
               </div>}
-              {step===2&&<div>
-                <div style={{fontWeight:600,marginBottom:16}}>Patient Information</div>
-                {[["Full Name",name,setName,"text"],["Age",age,setAge,"number"],["Phone Number",phone,setPhone,"tel"]].map(([l,v,set,t])=><div key={l} style={{marginBottom:14}}><label style={{fontSize:13,fontWeight:500,color: `var(--text-muted)`,display:"block",marginBottom:6}}>{l}</label><input type={t} value={v} onChange={e=>set(e.target.value)} placeholder={l} style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,outline:"none",boxSizing:"border-box",fontFamily:"inherit"}}/></div>)}
-                <div style={{marginBottom:20}}><label style={{fontSize:13,fontWeight:500,color: `var(--text-muted)`,display:"block",marginBottom:6}}>Reason for Visit</label><textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Describe symptoms..." style={{width:"100%",padding:"12px 14px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,outline:"none",resize:"vertical",minHeight:80,boxSizing:"border-box",fontFamily:"inherit"}}/></div>
-                <div style={{display:"flex",gap:10}}><button onClick={()=>setStep(1)} style={btn({flex:1,border:"2px solid #E5E7EB",background: `var(--bg-card)`,color: `var(--text-secondary)`})}>← Back</button><button onClick={()=>name&&phone&&setStep(3)} style={btn({flex:2,background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`})}>Continue to Pay →</button></div>
+
+              {step === 2 && <div>
+                <div style={{ fontWeight: 700, marginBottom: 14 }}>Patient Information</div>
+                {[["Full Name", name, setName, "text"], ["Age", age, setAge, "number"], ["Phone Number", phone, setPhone, "tel"]].map(([l, v, set, t]) => (
+                  <div key={l} style={{ marginBottom: 12 }}>
+                    <label className="form-label">{l}</label>
+                    <input type={t} value={v} onChange={e => set(e.target.value)} placeholder={l} className="form-input" />
+                  </div>
+                ))}
+                <div style={{ marginBottom: 18 }}>
+                  <label className="form-label">Reason for Visit</label>
+                  <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Describe symptoms..." className="form-input" style={{ resize: "vertical", minHeight: 70 }} />
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setStep(1)} className="btn btn-outline" style={{ flex: 1 }}>← Back</button>
+                  <button onClick={() => name && phone && setStep(3)} className="btn btn-primary" style={{ flex: 2 }}>Continue →</button>
+                </div>
               </div>}
-              {step===3&&<div>
-                <div style={{fontWeight:600,marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>Card Details</span> <span style={{fontSize:24}}>💳</span></div>
-                <div style={{background:"#1E293B",color: `var(--bg-card)`,padding:20,borderRadius:16,marginBottom:20,boxShadow:"0 10px 25px rgba(0,0,0,0.2)",position:"relative",overflow:"hidden"}}>
-                  <div style={{position:"absolute",right:-20,top:-20,width:100,height:100,background:"rgba(255,255,255,0.1)",borderRadius:"50%"}}></div>
-                  <div style={{fontSize:12,opacity:0.7,marginBottom:4}}>Card Number</div>
-                  <input type="text" placeholder="0000 0000 0000 0000" maxLength={19} style={{background:"transparent",border:"none",color: `var(--bg-card)`,fontSize:18,fontWeight:600,width:"100%",outline:"none",letterSpacing:2,marginBottom:16,fontFamily:"monospace"}}/>
-                  <div style={{display:"flex",gap:20}}>
-                    <div style={{flex:1}}><div style={{fontSize:12,opacity:0.7,marginBottom:4}}>Expiry</div><input type="text" placeholder="MM/YY" maxLength={5} style={{background:"transparent",border:"none",color: `var(--bg-card)`,fontSize:15,fontWeight:600,width:"100%",outline:"none",fontFamily:"monospace"}}/></div>
-                    <div style={{flex:1}}><div style={{fontSize:12,opacity:0.7,marginBottom:4}}>CVC</div><input type="password" placeholder="•••" maxLength={3} style={{background:"transparent",border:"none",color: `var(--bg-card)`,fontSize:15,fontWeight:600,width:"100%",outline:"none",fontFamily:"monospace"}}/></div>
+
+              {step === 3 && <div>
+                <div style={{ fontWeight: 700, marginBottom: 14, display: "flex", justifyContent: "space-between" }}>
+                  <span>Card Details</span><span style={{ fontSize: 22 }}>💳</span>
+                </div>
+                <div className="pay-card">
+                  <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 4 }}>Card Number</div>
+                  <input type="text" placeholder="0000 0000 0000 0000" maxLength={19} className="pay-input" />
+                  <div style={{ display: "flex", gap: 20, marginTop: 14 }}>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: 11, opacity: 0.5, marginBottom: 4 }}>Expiry</div><input type="text" placeholder="MM/YY" maxLength={5} className="pay-sm" /></div>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: 11, opacity: 0.5, marginBottom: 4 }}>CVC</div><input type="password" placeholder="•••" maxLength={3} className="pay-sm" /></div>
                   </div>
                 </div>
-                <div style={{fontSize:12,textAlign:"center",color: `var(--text-muted)`,marginBottom:20}}>🔒 Payments are secured by Stripe API Sandbox</div>
-                <div style={{display:"flex",gap:10}}><button onClick={()=>setStep(2)} style={btn({flex:1,border:"2px solid #E5E7EB",background: `var(--bg-card)`,color: `var(--text-secondary)`})}>← Back</button><button onClick={()=>setStep(4)} style={btn({flex:2,background:"#6366F1",color: `var(--bg-card)`})}>Verify Card ›</button></div>
-              </div>}
-              {step===4&&<div>
-                <div style={{background:"#F8FAFC",borderRadius:14,padding:18,marginBottom:20}}>
-                  <div style={{fontWeight:700,marginBottom:12,color:"#0F4C81"}}>Appointment Summary</div>
-                  {[["Doctor",doctor.name],["Speciality",doctor.spec],["Hospital",hospital.name],["Date",date],["Time",slot],["Patient",name],["Phone",phone],["Fee",`₹${doctor.fee}`]].map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:8,fontSize:13}}><span style={{color: `var(--text-muted)`}}>{k}</span><span style={{fontWeight:600}}>{v}</span></div>)}
+                <div style={{ fontSize: 12, textAlign: "center", color: "var(--text-muted)", marginBottom: 18 }}>🔒 Secured by Stripe API Sandbox</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setStep(2)} className="btn btn-outline" style={{ flex: 1 }}>← Back</button>
+                  <button onClick={() => setStep(4)} className="btn btn-primary" style={{ flex: 2 }}>Verify →</button>
                 </div>
-                <div style={{display:"flex",gap:10}}><button onClick={()=>setStep(3)} style={btn({flex:1,border:"2px solid #E5E7EB",background: `var(--bg-card)`,color: `var(--text-secondary)`})}>← Back</button><button onClick={confirmBooking} disabled={saving} style={btn({flex:2,background:saving?"#94A3B8":"linear-gradient(135deg,#059669,#10B981)",color: `var(--bg-card)`,boxShadow:"0 4px 15px rgba(16,185,129,0.3)"})}>{saving?"Processing...":`Pay ₹${doctor.fee} & Confirm ✓`}</button></div>
+              </div>}
+
+              {step === 4 && <div>
+                <div className="summary-box">
+                  <div style={{ fontWeight: 700, marginBottom: 12, color: "var(--primary)" }}>Appointment Summary</div>
+                  {[["Doctor", doctor.name], ["Speciality", doctor.spec], ["Hospital", hospital.name], ["Date", date], ["Time", slot], ["Patient", name], ["Phone", phone], ["Fee", `₹${doctor.fee}`]].map(([k, v]) => (
+                    <div key={k} className="summary-row"><span className="k">{k}</span><span className="v">{v}</span></div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setStep(3)} className="btn btn-outline" style={{ flex: 1 }}>← Back</button>
+                  <button onClick={confirmBooking} disabled={saving} className="btn btn-success" style={{ flex: 2 }}>
+                    {saving ? "Processing..." : `Pay ₹${doctor.fee} & Confirm ✓`}
+                  </button>
+                </div>
               </div>}
             </>
-          ):(
-            <div style={{textAlign:"center",padding:"20px 0"}}>
-              <div style={{fontSize:64,marginBottom:16}}>✅</div>
-              <div style={{fontSize:22,fontWeight:800,color:"#059669",marginBottom:8}}>Booking Confirmed!</div>
-              <div style={{fontSize:14,color: `var(--text-muted)`,marginBottom:4}}>Hi <strong>{user?.displayName||"User"}</strong>! Your appointment is booked.</div>
-              <div style={{fontSize:14,color: `var(--text-muted)`,marginBottom:20}}>ID: <strong>{bookingId}</strong></div>
-              <button onClick={onClose} style={btn({background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,padding:"12px 32px",borderRadius:12})}>Done</button>
+          ) : (
+            <div className="book-ok">
+              <div className="book-ok-icon">✅</div>
+              <div className="book-ok-title">Booking Confirmed!</div>
+              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 4 }}>Hi <strong>{user?.displayName || "User"}</strong>, your appointment is booked.</div>
+              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 20 }}>ID: <strong style={{ color: "var(--primary)" }}>{bookingId}</strong></div>
+              <button onClick={onClose} className="btn btn-primary">Done</button>
             </div>
           )}
         </div>
@@ -284,1220 +393,1075 @@ function BookingModal({doctor,hospital,user,onClose,onBooked}){
   );
 }
 
+/* ═══ CHATBOT ═══ */
 function ChatbotWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([{ sender: "bot", text: "Hi! I am PulseRATE AI. What symptoms are you experiencing today?" }]);
+  const [messages, setMessages] = useState([{ sender: "bot", text: "Hi! I'm PulseRATE AI. What symptoms are you experiencing?" }]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
 
-  const handleSend = () => {
+  const send = () => {
     if (!input.trim()) return;
-    setMessages(prev => [...prev, { sender: "user", text: input }]);
-    const currentInput = input.toLowerCase();
-    setInput("");
-    setTyping(true);
-
+    setMessages(p => [...p, { sender: "user", text: input }]);
+    const q = input.toLowerCase(); setInput(""); setTyping(true);
     setTimeout(() => {
-      let response = "I recommend consulting a General Physician for a thorough checkup.";
-      if (currentInput.includes("headache") || currentInput.includes("migraine")) response = "Frequent headaches can be concerning. I highly recommend booking an appointment with a **Neurologist**.";
-      else if (currentInput.includes("heart") || currentInput.includes("chest") || currentInput.includes("pain")) response = "Chest pain is a serious symptom. Please consult a **Cardiologist** immediately, or visit the Emergency ward if severe.";
-      else if (currentInput.includes("stomach") || currentInput.includes("digestion") || currentInput.includes("acid")) response = "Digestive issues are best evaluated by a **Gastroenterologist**.";
-      else if (currentInput.includes("bone") || currentInput.includes("joint") || currentInput.includes("knee")) response = "For joint and bone issues, an **Orthopedic** specialist would be the best choice.";
-
-      setMessages(prev => [...prev, { sender: "bot", text: response }]);
-      setTyping(false);
-    }, 1500);
+      let r = "I recommend consulting a General Physician for a thorough checkup.";
+      if (q.includes("headache") || q.includes("migraine")) r = "Frequent headaches can be concerning. I recommend seeing a **Neurologist**.";
+      else if (q.includes("heart") || q.includes("chest")) r = "Chest pain is serious. Please consult a **Cardiologist** immediately.";
+      else if (q.includes("stomach") || q.includes("digestion")) r = "Digestive issues are best evaluated by a **Gastroenterologist**.";
+      else if (q.includes("bone") || q.includes("joint") || q.includes("knee")) r = "Joint issues are best handled by an **Orthopedic** specialist.";
+      setMessages(p => [...p, { sender: "bot", text: r }]); setTyping(false);
+    }, 1200);
   };
 
   return (
-    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999 }}>
+    <div className="chat-wrap">
       {open ? (
-        <div style={{ width: 340, height: 480, background: `var(--bg-card)`, borderRadius: 20, boxShadow: "0 10px 40px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid #E5E7EB" }}>
-          <div style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)", padding: "16px 20px", color: `var(--bg-card)`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="chat-win">
+          <div className="chat-head">
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>PulseRATE AI</div>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>🟢 Online • Medical Assistant</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>PulseRATE AI</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>🟢 Online · Medical Assistant</div>
             </div>
-            <button onClick={() => setOpen(false)} style={{ background: "transparent", border: "none", color: `var(--bg-card)`, cursor: "pointer", fontSize: 20 }}>✕</button>
+            <button onClick={() => setOpen(false)} style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 18 }}>✕</button>
           </div>
-          <div style={{ flex: 1, padding: 16, overflowY: "auto", background: "#F8FAFC", display: "flex", flexDirection: "column", gap: 12 }}>
-            {messages.map((m, i) => (
-              <div key={i} style={{ alignSelf: m.sender === "user" ? "flex-end" : "flex-start", maxWidth: "80%", background: m.sender === "user" ? "#4F46E5" : `var(--bg-card)`, color: m.sender === "user" ? "white" : `var(--text-primary)`, padding: "10px 14px", borderRadius: 16, borderBottomRightRadius: m.sender === "user" ? 4 : 16, borderBottomLeftRadius: m.sender === "bot" ? 4 : 16, fontSize: 14, boxShadow: "0 2px 5px rgba(0,0,0,0.05)", lineHeight: 1.4 }}>
-                {m.text}
-              </div>
-            ))}
-            {typing && <div style={{ alignSelf: "flex-start", background: `var(--bg-card)`, padding: "10px 14px", borderRadius: 16, color: `var(--text-muted)`, fontSize: 12, boxShadow: "0 2px 5px rgba(0,0,0,0.05)" }}>AI is typing...</div>}
+          <div className="chat-msgs">
+            {messages.map((m, i) => <div key={i} className={`chat-bub ${m.sender}`}>{m.text}</div>)}
+            {typing && <div className="chat-typing">AI is thinking...</div>}
           </div>
-          <div style={{ padding: 12, borderTop: "1px solid #E5E7EB", background: `var(--bg-card)`, display: "flex", gap: 8 }}>
-            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type your symptoms..." style={{ flex: 1, padding: "10px 14px", borderRadius: 20, border: "1px solid #E5E7EB", outline: "none", fontSize: 14 }} />
-            <button onClick={handleSend} style={{ background: "#4F46E5", color: `var(--bg-card)`, border: "none", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>➤</button>
+          <div className="chat-bar">
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="Type symptoms..." className="chat-inp" />
+            <button onClick={send} className="chat-send">➤</button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setOpen(true)} style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: `var(--bg-card)`, border: "none", cursor: "pointer", boxShadow: "0 10px 25px rgba(79,70,229,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, transition: "transform 0.2s" }} onMouseEnter={e => e.currentTarget.style.transform = "scale(1.1)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-          💬
-        </button>
+        <button onClick={() => setOpen(true)} className="chat-fab" title="Chat with AI">💬</button>
       )}
     </div>
   );
 }
 
-export default function App(){
+/* ═══════════════════════════════════════
+   MAIN APP
+   ═══════════════════════════════════════ */
+export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
-  const [view,setView]=useState("home");
+  const [view, setView] = useState("home");
+  const [appReady, setAppReady] = useState(false);
 
-  // 🌙 Dark Mode state
   const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem("hc-theme");
-    return saved ? saved === "dark" : true; // Default: dark
+    const s = localStorage.getItem("hc-theme");
+    return s ? s === "dark" : false;
   });
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
     localStorage.setItem("hc-theme", isDark ? "dark" : "light");
   }, [isDark]);
-  const [selectedHospital,setSelectedHospital]=useState(null);
-  const [search,setSearch]=useState("");
-  const [specFilter,setSpecFilter]=useState("All");
-  const [sortBy,setSortBy]=useState("rating");
-  const [bookingDoctor,setBookingDoctor]=useState(null);
-  const [activeTab,setActiveTab]=useState("doctors");
-  const [selectedTests,setSelectedTests]=useState(["Blood Test (CBC)","MRI Brain"]);
-  const [reviewText,setReviewText]=useState("");
-  const [reviewRating,setReviewRating]=useState(5);
-  const [searchInput,setSearchInput]=useState("");
-  const [notif,setNotif]=useState(null);
+
+  const [selectedHospital, setSelectedHospital] = useState(null);
+  const [search, setSearch] = useState("");
+  const [specFilter, setSpecFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("rating");
+  const [bookingDoctor, setBookingDoctor] = useState(null);
+  const [activeTab, setActiveTab] = useState("doctors");
+  const [selectedTests, setSelectedTests] = useState(["Blood Test (CBC)", "MRI Brain"]);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [searchInput, setSearchInput] = useState("");
+  const [notif, setNotif] = useState(null);
   const [smsPush, setSmsPush] = useState(false);
-
-  // 🆕 NEW STATE — Appointments, Reviews from backend
-  const [myAppointments,setMyAppointments]=useState([]);
-  const [loadingAppts,setLoadingAppts]=useState(false);
-  const [hospitalReviews,setHospitalReviews]=useState([]);
-  const [loadingReviews,setLoadingReviews]=useState(false);
-  const [tipsFilter,setTipsFilter]=useState("All");
-  const [cityInput,setCityInput]=useState("New Delhi");
-
-  // 🤖 AI Health Checkup state
-  const [aiDisease,setAiDisease]=useState(null);
-  const [aiModels,setAiModels]=useState(null);
-  const [aiForm,setAiForm]=useState({});
-  const [aiResult,setAiResult]=useState(null);
-  const [aiLoading,setAiLoading]=useState(false);
-  const [aiModelsLoading,setAiModelsLoading]=useState(false);
-
-  // 📊 Health History state
-  const [healthHistory,setHealthHistory]=useState([]);
-  const [loadingHistory,setLoadingHistory]=useState(false);
-
-  // 📹 Telemedicine state
-  const [callRoom,setCallRoom]=useState(null);
-
-  // 🛡️ Admin state
-  const [adminStats,setAdminStats]=useState(null);
-  const [loadingAdmin,setLoadingAdmin]=useState(false);
-  const isAdmin = user?.email === "admin@pulserate.com";
-
-  // 🏥 Real hospital data from backend
+  const [myAppointments, setMyAppointments] = useState([]);
+  const [loadingAppts, setLoadingAppts] = useState(false);
+  const [hospitalReviews, setHospitalReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [tipsFilter, setTipsFilter] = useState("All");
+  const [cityInput, setCityInput] = useState("New Delhi");
+  const [aiDisease, setAiDisease] = useState(null);
+  const [aiModels, setAiModels] = useState(null);
+  const [aiForm, setAiForm] = useState({});
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiModelsLoading, setAiModelsLoading] = useState(false);
+  const [healthHistory, setHealthHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [callRoom, setCallRoom] = useState(null);
+  const [adminStats, setAdminStats] = useState(null);
+  const [loadingAdmin, setLoadingAdmin] = useState(false);
   const [hospitals, setHospitals] = useState([]);
   const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [apiError, setApiError] = useState(null);
-
-  // 👨‍⚕️ Global Doctors state
   const [allDoctors, setAllDoctors] = useState([]);
   const [loadingAllDocs, setLoadingAllDocs] = useState(false);
   const [docSearch, setDocSearch] = useState("");
   const [docSpecFilter, setDocSpecFilter] = useState("All");
   const [docMapView, setDocMapView] = useState(false);
 
-  // ✅ Fetch real hospitals from backend
+  const isAdmin = user?.email === "admin@pulserate.com";
+  const isDoctor = user?.email?.endsWith("@pulserate.doc");
+
+  // Hero typing animation
+  const typedText = useTyping([
+    "Book Appointments",
+    "Find Nearby Hospitals",
+    "Compare Treatment Costs",
+    "Get AI Health Predictions",
+  ], 70, 35, 2200);
+
+  // Startup loader
+  useEffect(() => {
+    const t = setTimeout(() => setAppReady(true), 2200);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Auth listener
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, u => { setUser(u); setAuthLoading(false); });
+    return unsub;
+  }, []);
+
+  // Fetch hospitals on mount
+  useEffect(() => { fetchHospitals("New Delhi"); // eslint-disable-next-line
+  }, []);
+
   const fetchHospitals = async (city = "New Delhi") => {
-    setLoadingHospitals(true);
-    setApiError(null);
+    setLoadingHospitals(true); setApiError(null);
     try {
       const res = await fetch(`${API_URL}/hospitals?city=${encodeURIComponent(city)}`);
       const data = await res.json();
-      if(data.success && data.hospitals.length > 0){
-        // Add colors and enrich data
-        const enriched = data.hospitals.map((h, i) => ({
-          ...h,
-          color: COLORS[i % COLORS.length],
-          image: "🏥",
-          doctors: [
-            {id:i*10+1, name:"Dr. Available Doctor", spec:"General Medicine", exp:10, fee:500, available:"Today", rating:4.5, img:"👨‍⚕️"},
-          ],
+      if (data.success && data.hospitals.length > 0) {
+        setHospitals(data.hospitals.map((h, i) => ({
+          ...h, color: COLORS[i % COLORS.length], image: "🏥",
+          doctors: [{ id: i * 10 + 1, name: "Dr. Available Doctor", spec: "General Medicine", exp: 10, fee: 500, available: "Today", rating: 4.5, img: "👨‍⚕️" }],
           reviewsList: [],
-        }));
-        setHospitals(enriched);
-      } else {
-        setApiError("No hospitals found for this city.");
-      }
-    } catch(err) {
-      setApiError("Could not connect to backend. Make sure server is running on port 5000.");
-    }
+        })));
+      } else { setApiError("No hospitals found for this city."); }
+    } catch { setApiError("Could not connect to backend."); }
     setLoadingHospitals(false);
   };
 
-  // 🆕 Fetch doctors from backend API for a hospital
   const fetchDoctors = async (hospitalId) => {
-    try {
-      const res = await fetch(`${API_URL}/doctors?hospitalId=${hospitalId}`);
-      const data = await res.json();
-      if (data.success) return data.doctors;
-    } catch (err) { /* fallback to default */ }
+    try { const res = await fetch(`${API_URL}/doctors?hospitalId=${hospitalId}`); const data = await res.json(); if (data.success) return data.doctors; } catch { }
     return null;
   };
 
-  // 🆕 Fetch user's appointments
   const fetchMyAppointments = useCallback(async () => {
-    if (!user?.email) return;
-    setLoadingAppts(true);
-    try {
-      const res = await fetch(`${API_URL}/appointments/${encodeURIComponent(user.email)}`);
-      const data = await res.json();
-      if (data.success) setMyAppointments(data.appointments);
-    } catch (err) { /* offline fallback */ }
+    if (!user?.email) return; setLoadingAppts(true);
+    try { const res = await fetch(`${API_URL}/appointments/${encodeURIComponent(user.email)}`); const data = await res.json(); if (data.success) setMyAppointments(data.appointments); } catch { }
     setLoadingAppts(false);
   }, [user]);
 
-  // 🆕 Fetch reviews for a hospital
   const fetchReviews = async (hospitalId) => {
     setLoadingReviews(true);
-    try {
-      const res = await fetch(`${API_URL}/reviews/${hospitalId}`);
-      const data = await res.json();
-      if (data.success) setHospitalReviews(data.reviews);
-    } catch (err) { /* offline fallback */ }
+    try { const res = await fetch(`${API_URL}/reviews/${hospitalId}`); const data = await res.json(); if (data.success) setHospitalReviews(data.reviews); } catch { }
     setLoadingReviews(false);
   };
 
-  // 🆕 Submit review to backend
-  const submitReview = async (hospitalId, hospitalName) => {
+  const submitReview = async (hospitalId) => {
     if (!reviewText) return;
     try {
-      await fetch(`${API_URL}/reviews`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hospitalId, hospitalName, userName: user?.displayName || "Anonymous",
-          userEmail: user?.email || "", rating: reviewRating, text: reviewText,
-        }),
-      });
-      notifShow("Review submitted!");
-      setReviewText(""); setReviewRating(5);
-      fetchReviews(hospitalId);
-    } catch (err) {
-      notifShow("Review saved locally!");
-      setReviewText(""); setReviewRating(5);
-    }
+      await fetch(`${API_URL}/reviews`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hospitalId, hospitalName: selectedHospital?.name, userName: user?.displayName || "Anonymous", userEmail: user?.email || "", rating: reviewRating, text: reviewText }) });
+      notifShow("Review submitted!"); setReviewText(""); setReviewRating(5); fetchReviews(hospitalId);
+    } catch { notifShow("Review saved locally!"); setReviewText(""); setReviewRating(5); }
   };
 
-  // ✅ Listen to auth state
-  useEffect(()=>{
-    const unsub = onAuthStateChanged(auth, u => {
-      setUser(u);
-      setAuthLoading(false);
-    });
-    return unsub;
-  },[]);
+  const filtered = hospitals.filter(h => {
+    const q = search.toLowerCase();
+    const ms = !q || h.name.toLowerCase().includes(q) || h.city.toLowerCase().includes(q) || h.specialities.some(s => s.toLowerCase().includes(q));
+    return ms && (specFilter === "All" || h.specialities.some(s => s === specFilter));
+  }).sort((a, b) => sortBy === "rating" ? b.rating - a.rating : b.reviews - a.reviews);
 
-  // ✅ Fetch hospitals on load
-  useEffect(()=>{
-    fetchHospitals("New Delhi");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
-
-  const filtered = hospitals.filter(h=>{
-    const q=search.toLowerCase();
-    const ms=!q||h.name.toLowerCase().includes(q)||h.city.toLowerCase().includes(q)||h.specialities.some(s=>s.toLowerCase().includes(q));
-    const mf=specFilter==="All"||h.specialities.some(s=>s===specFilter);
-    return ms&&mf;
-  }).sort((a,b)=>sortBy==="rating"?b.rating-a.rating:b.reviews-a.reviews);
-
-  // 🆕 Fetch all doctors from backend
   const fetchAllDoctors = async () => {
     setLoadingAllDocs(true);
     try {
       const res = await fetch(`${API_URL}/doctors?spec=${docSpecFilter === "All" ? "" : docSpecFilter}&q=${docSearch}`);
       const data = await res.json();
       if (data.success) {
-        // Enforce hospital coordinates for mapping (fallback to Delhi center)
-        const docsWithCoords = data.doctors.map(d => {
-          const hosp = hospitals.find(h => h.id === Math.floor(d.id / 1000)) || hospitals[0] || { lat: 28.6139, lng: 77.209, name: "Hospital Location" };
+        setAllDoctors(data.doctors.map(d => {
+          const hosp = hospitals.find(h => h.id === Math.floor(d.id / 1000)) || hospitals[0] || { lat: 28.6139, lng: 77.209, name: "Hospital" };
           return { ...d, lat: hosp.lat, lng: hosp.lng, hospitalName: hosp.name };
-        });
-        setAllDoctors(docsWithCoords);
+        }));
       }
-    } catch (err) { /* fallback */ }
+    } catch { }
     setLoadingAllDocs(false);
   };
 
   const go = async (v, h = null) => {
     setView(v);
-    if (h) {
-      // Fetch doctors from backend when opening hospital detail
-      const docs = await fetchDoctors(h.id);
-      if (docs) h = { ...h, doctors: docs };
-      setSelectedHospital(h);
-    }
+    if (h) { const docs = await fetchDoctors(h.id); if (docs) h = { ...h, doctors: docs }; setSelectedHospital(h); }
     if (v === "detail" && h) fetchReviews(h.id);
     if (v === "appointments") fetchMyAppointments();
     if (v === "doctors") fetchAllDoctors();
   };
-  const notifShow=(m)=>{setNotif(m);setTimeout(()=>setNotif(null),3000);};
-  const toggleTest=(t)=>setSelectedTests(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
-  const bookSpecialist = async (disease) => {
+
+  const notifShow = (m) => { setNotif(m); setTimeout(() => setNotif(null), 3000); };
+  const toggleTest = (t) => setSelectedTests(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
+
+  const bookSpecialist = (disease) => {
     if (!user) { setShowAuth(true); return; }
-    const specMapping = { heart: "Cardiology", cancer: "Oncology", diabetes: "General Medicine" };
-    const spec = specMapping[disease] || "General Medicine";
-    setDocSpecFilter(spec);
-    go("doctors");
-    notifShow(`AI Recommendation: Consulting a ${spec} specialist.`);
+    const map = { heart: "Cardiology", cancer: "Oncology", diabetes: "General Medicine" };
+    setDocSpecFilter(map[disease] || "General Medicine"); go("doctors"); notifShow(`AI Recommendation: Consult a ${map[disease]} specialist.`);
   };
 
-  const handleLogout=async()=>{ await signOut(auth); notifShow("Logged out successfully!"); };
+  const handleLogout = async () => { await signOut(auth); notifShow("Logged out!"); };
 
-  // 🤖 AI Checkup helpers (routed through Node.js API gateway)
   const ML_API = `${API_URL}/ml`;
 
   const fetchAiModels = async () => {
-    if (aiModels) return;
-    setAiModelsLoading(true);
-    try {
-      const res = await fetch(`${ML_API}/models`);
-      const data = await res.json();
-      if (data.success) setAiModels(data.models);
-    } catch (err) {
-      notifShow("ML server not reachable. Start it on port 5001.");
-    }
+    if (aiModels) return; setAiModelsLoading(true);
+    try { const res = await fetch(`${ML_API}/models`); const data = await res.json(); if (data.success) setAiModels(data.models); }
+    catch { notifShow("ML server not reachable."); }
     setAiModelsLoading(false);
   };
 
-  const selectDisease = (d) => {
-    setAiDisease(d);
-    setAiResult(null);
-    setAiForm({});
-  };
-
   const runPrediction = async () => {
-    if (!aiDisease) return;
-    setAiLoading(true);
-    setAiResult(null);
+    if (!aiDisease) return; setAiLoading(true); setAiResult(null);
     try {
-      const res = await fetch(`${ML_API}/predict/${aiDisease}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(aiForm),
-      });
+      const res = await fetch(`${ML_API}/predict/${aiDisease}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(aiForm) });
       const data = await res.json();
       if (data.success) {
         setAiResult(data);
-        // 📊 Auto-save to Firestore if logged in
         if (user) {
-          try {
-            await addDoc(collection(db, "predictions"), {
-              userId: user.uid,
-              email: user.email,
-              disease: aiDisease,
-              result: { label: data.label, probability: data.probability, confidence: data.confidence, risk_level: data.risk_level, model_used: data.model_used, recommendation: data.recommendation },
-              inputData: aiForm,
-              timestamp: serverTimestamp(),
-            });
-          } catch (e) { /* Firestore save failed silently — prediction still shown */ }
+          try { await addDoc(collection(db, "predictions"), { userId: user.uid, email: user.email, disease: aiDisease, result: { label: data.label, probability: data.probability, confidence: data.confidence, risk_level: data.risk_level, model_used: data.model_used, recommendation: data.recommendation }, inputData: aiForm, timestamp: serverTimestamp() }); } catch { }
         }
-      }
-      else notifShow(data.error || "Prediction failed");
-    } catch (err) {
-      notifShow("Could not reach ML server. Is it running?");
-    }
+      } else notifShow(data.error || "Prediction failed");
+    } catch { notifShow("Could not reach ML server."); }
     setAiLoading(false);
   };
 
-  // 📊 Fetch health history from Firestore
   const fetchHealthHistory = async () => {
-    if (!user) return;
-    setLoadingHistory(true);
+    if (!user) return; setLoadingHistory(true);
     try {
-      const q = query(collection(db, "predictions"), where("userId", "==", user.uid), orderBy("timestamp", "desc"));
-      const snapshot = await getDocs(q);
-      const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), timestamp: doc.data().timestamp?.toDate?.() || new Date() }));
-      setHealthHistory(history);
-    } catch (e) { /* Firestore read failed */ }
+      const q2 = query(collection(db, "predictions"), where("userId", "==", user.uid), orderBy("timestamp", "desc"));
+      const snap = await getDocs(q2);
+      setHealthHistory(snap.docs.map(d => ({ id: d.id, ...d.data(), timestamp: d.data().timestamp?.toDate?.() || new Date() })));
+    } catch { }
     setLoadingHistory(false);
   };
 
-  const isAdmin = user?.email === "admin@pulserate.com";
-  const isDoctor = user?.email?.endsWith("@pulserate.doc");
-
-  // 🛡️ Fetch Admin Stats
   const fetchAdminStats = async () => {
     setLoadingAdmin(true);
-    try {
-      const res = await fetch(`${API_URL}/admin/stats`);
-      const data = await res.json();
-      if (data.success) setAdminStats(data.stats);
-    } catch (err) {
-      notifShow("Could not load admin stats.");
-    }
+    try { const res = await fetch(`${API_URL}/admin/stats`); const data = await res.json(); if (data.success) setAdminStats(data.stats); } catch { notifShow("Could not load admin stats."); }
     setLoadingAdmin(false);
   };
 
-  // 📄 Generate PDF Report
   const downloadPDF = async (elementId, filename) => {
-    const el = document.getElementById(elementId);
-    if (!el) return;
+    const el = document.getElementById(elementId); if (!el) return;
     try {
       const canvas = await html2canvas(el, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.setFontSize(10);
-      pdf.text("Generated by PulseRATE AI Platform", 10, pdf.internal.pageSize.getHeight() - 10);
-      
-      pdf.save(filename);
-      notifShow("PDF downloaded successfully!");
-    } catch (err) {
-      notifShow("Failed to generate PDF.");
-    }
+      const w = pdf.internal.pageSize.getWidth();
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, w, (canvas.height * w) / canvas.width);
+      pdf.save(filename); notifShow("PDF downloaded!");
+    } catch { notifShow("Failed to generate PDF."); }
   };
 
-  // 🆕 Cancel appointment via backend
   const cancelAppointment = async (id) => {
-    try {
-      await fetch(`${API_URL}/appointments/${id}`, { method: "DELETE" });
-      notifShow("Appointment cancelled.");
-      fetchMyAppointments();
-    } catch (err) { notifShow("Could not cancel. Try again."); }
+    try { await fetch(`${API_URL}/appointments/${id}`, { method: "DELETE" }); notifShow("Appointment cancelled."); fetchMyAppointments(); }
+    catch { notifShow("Could not cancel."); }
   };
 
-  const card={background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",overflow:"hidden",transition:"transform 0.2s,box-shadow 0.2s",cursor:"pointer"};
-  const btn=(e={})=>({padding:"10px 20px",borderRadius:10,border:"none",fontWeight:700,cursor:"pointer",fontSize:14,...e});
-  const inp={padding:"12px 16px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,outline:"none",fontFamily:"inherit",width:"100%",boxSizing:"border-box"};
+  /* ── RENDER ── */
+  if (authLoading) return <LoaderScreen visible={true} />;
+  if (showAuth) return <AuthPage onSuccess={() => setShowAuth(false)} />;
 
-  if(authLoading) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontSize:20,fontWeight:700,color:"#0F4C81"}}>🩺 Loading PulseRATE...</div>;
-  if(showAuth) return <AuthPage onSuccess={()=>setShowAuth(false)}/>;
+  return (
+    <>
+      <LoaderScreen visible={!appReady} />
+      <div className="app-root" style={{ opacity: appReady ? 1 : 0, transition: "opacity 0.5s ease" }}>
 
-  return(
-    <div style={{fontFamily:"'Nunito','Segoe UI',sans-serif",minHeight:"100vh",background: `var(--bg-main)`,color: `var(--text-primary)`}}>
-      <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
-      {notif&&<div style={{position:"fixed",top:20,right:20,background:"#065F46",color: `var(--bg-card)`,padding:"12px 20px",borderRadius:12,zIndex:9999,fontWeight:600,fontSize:14}}>✓ {notif}</div>}
-      
-      {/* 📱 Simulated Twilio SMS Push Notification */}
-      <div style={{ position: "fixed", top: smsPush ? 20 : -150, left: "50%", transform: "translateX(-50%)", background: "rgba(255,255,255,0.9)", backdropFilter: "blur(10px)", padding: "16px 20px", borderRadius: 24, zIndex: 10000, boxShadow: "0 15px 40px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", gap: 16, width: "90%", maxWidth: 400, transition: "top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)", border: "1px solid rgba(255,255,255,0.4)" }}>
-        <div style={{ width: 44, height: 44, background: "#10B981", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>💬</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-            <span style={{ fontWeight: 700, fontSize: 13, color: `var(--text-primary)` }}>Messages</span>
-            <span style={{ fontSize: 12, color: `var(--text-muted)` }}>now</span>
+        {notif && <div className="toast">✓ {notif}</div>}
+
+        <div className={`sms-push ${smsPush ? "show" : "hide"}`}>
+          <div className="sms-ico">💬</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>Messages</span>
+              <span style={{ fontSize: 12, color: "var(--text-muted)" }}>now</span>
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}><strong style={{ color: "var(--primary)" }}>PulseRATE:</strong> Appointment confirmed!</div>
           </div>
-          <div style={{ fontSize: 13, color: `var(--text-secondary)`, lineHeight: 1.4 }}><strong>PulseRATE:</strong> Your appointment is confirmed. Thank you for booking!</div>
         </div>
-      </div>
 
-      {bookingDoctor&&selectedHospital&&<BookingModal doctor={bookingDoctor} hospital={selectedHospital} user={user} onClose={()=>setBookingDoctor(null)} onBooked={()=>{ fetchMyAppointments(); setSmsPush(true); setTimeout(()=>setSmsPush(false), 6000); }}/>}
+        {bookingDoctor && selectedHospital && <BookingModal doctor={bookingDoctor} hospital={selectedHospital} user={user} onClose={() => setBookingDoctor(null)} onBooked={() => { fetchMyAppointments(); setSmsPush(true); setTimeout(() => setSmsPush(false), 5000); }} />}
 
-      {/* NAVBAR */}
-      <nav style={{background:"linear-gradient(135deg,#0F4C81,#1565C0)",padding:"0 20px",position:"sticky",top:0,zIndex:500,boxShadow:"0 2px 20px rgba(15,76,129,0.4)"}}>
-        <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",gap:16,height:60}}>
-          <div style={{display: "flex", alignItems: "center", gap: 10, cursor:"pointer"}} onClick={()=>go("home")}>
-            <img src="/pulserate-logo.png?v=2" alt="PulseRATE Logo" style={{height: 32, filter: "brightness(0) invert(1)"}} />
-            <div style={{color: `var(--bg-card)`,fontWeight:900,fontSize:20, letterSpacing: 1}}>PULSERATE</div>
-          </div>
-          <div style={{flex:1}}/>
-          {[["Hospitals","list"],["Doctors","doctors"],["Compare","compare"],["🗺️ Map","map"],["🤖 AI Checkup","ai-checkup"],...(user&&!isDoctor?[["📊 My Health","health-history"]]:[]),...(isDoctor?[["👨‍⚕️ Dashboard","doctor-dash"]]:[]),["🚨 SOS","emergency"],["💡 Tips","tips"],...(user?[["📋 My Appts","appointments"]]:[]),...(isAdmin?[["🛡️ Admin","admin"]]:[])].map(([l,v])=><span key={v} onClick={()=>{go(v);if(v==="ai-checkup")fetchAiModels();if(v==="health-history")fetchHealthHistory();if(v==="admin")fetchAdminStats(); if(v==="doctors") fetchAllDoctors();}} style={{color: `var(--bg-card)`,fontSize:13,cursor:"pointer",fontWeight:600,padding:"6px 10px",borderRadius:8,background:view===v?"rgba(255,255,255,0.2)":"transparent"}}>{l}</span>)}
-          {/* 🌙 Dark Mode Toggle */}
-          <button onClick={()=>setIsDark(d=>!d)} title={isDark?"Switch to Light Mode":"Switch to Dark Mode"} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:20,padding:"5px 12px",color:"white",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",gap:6,fontWeight:700,backdropFilter:"blur(4px)",transition:"background 0.2s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.25)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.15)"}>{isDark?"☀️":"🌙"}</button>
-          {user ? (
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <div style={{background:"rgba(255,255,255,0.15)",borderRadius:20,padding:"6px 14px",color: `var(--bg-card)`,fontSize:13,fontWeight:600}}>👤 {user.displayName||user.email}</div>
-              <button onClick={handleLogout} style={btn({background:"rgba(255,255,255,0.2)",color: `var(--bg-card)`,fontSize:13,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.3)"})}>Logout</button>
+        {/* ═══ NAVBAR ═══ */}
+        <nav className="navbar">
+          <div className="navbar-inner">
+            <div className="nav-brand" onClick={() => go("home")}>
+              <img src="/pulserate-logo.png?v=2" alt="PulseRATE" />
+              <div className="nav-brand-text">Pulse<span className="rate">RATE</span></div>
             </div>
-          ) : (
-            <button onClick={()=>setShowAuth(true)} style={btn({background: `var(--bg-card)`,color:"#0F4C81",fontSize:13,padding:"8px 16px"})}>Sign In / Sign Up</button>
-          )}
-        </div>
-      </nav>
-
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"24px 20px"}}>
-
-        {/* =========== HOME =========== */}
-        {view==="home"&&<div>
-          <div style={{background:"linear-gradient(135deg,#0F4C81,#1565C0 60%,#42A5F5)",borderRadius:20,padding:"48px 40px",marginBottom:32,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:40,top:-20,fontSize:120,opacity:0.08}}>🏥</div>
-            {user&&<div style={{background:"rgba(255,255,255,0.15)",borderRadius:12,padding:"10px 16px",marginBottom:16,fontSize:14,fontWeight:600,display:"inline-block"}}>👋 Welcome back, {user.displayName||"User"}!</div>}
-            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:12,textTransform:"uppercase"}}>India's Healthcare Platform</div>
-            <h1 style={{margin:"0 0 12px",fontSize:36,fontWeight:900,lineHeight:1.2}}>Find Real Hospitals,<br/>Book Appointments</h1>
-            <p style={{margin:"0 0 28px",opacity:0.85,fontSize:16,maxWidth:500}}>Real hospital data powered by Google Places. Search any city in India!</p>
-
-            {/* City Search */}
-            <div style={{display:"flex",gap:12,maxWidth:600,marginBottom:16}}>
-              <div style={{flex:1,position:"relative"}}>
-                <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:18}}>🏙️</span>
-                <input value={cityInput} onChange={e=>setCityInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&fetchHospitals(cityInput)} placeholder="Enter city (e.g. Mumbai, Delhi, Bangalore)" style={{...inp,paddingLeft:44,borderColor:"transparent",background:"rgba(255,255,255,0.95)",borderRadius:12,fontSize:15}}/>
+            <div className="nav-spacer" />
+            {[
+              ["🏥", "Hospitals", "list"],
+              ["👨‍⚕️", "Doctors", "doctors"],
+              ["🧪", "Compare", "compare"],
+              ["🗺️", "Map", "map"],
+              ["🤖", "AI Checkup", "ai-checkup"],
+              ...(user && !isDoctor ? [["📊", "My Health", "health-history"]] : []),
+              ...(isDoctor ? [["👨‍⚕️", "Dashboard", "doctor-dash"]] : []),
+              ["🚨", "SOS", "emergency"],
+              ["💡", "Tips", "tips"],
+              ...(user ? [["📋", "Appts", "appointments"]] : []),
+              ...(isAdmin ? [["🛡️", "Admin", "admin"]] : []),
+            ].map(([ico, label, v]) => (
+              <span key={v} className={`nav-item ${view === v ? "active" : ""}`} onClick={() => { go(v); if (v === "ai-checkup") fetchAiModels(); if (v === "health-history") fetchHealthHistory(); if (v === "admin") fetchAdminStats(); if (v === "doctors") fetchAllDoctors(); }}>
+                {ico} {label}
+              </span>
+            ))}
+            <button className="theme-btn" onClick={() => setIsDark(d => !d)} title={isDark ? "Light Mode" : "Dark Mode"}>
+              {isDark ? "☀️" : "🌙"}
+            </button>
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 4 }}>
+                <div className="user-chip">👤 {user.displayName || user.email}</div>
+                <button className="btn-logout" onClick={handleLogout}>Logout</button>
               </div>
-              <button onClick={()=>fetchHospitals(cityInput)} disabled={loadingHospitals} style={btn({background:"#F59E0B",color: `var(--text-primary)`,fontSize:15,padding:"12px 28px",borderRadius:12})}>
-                {loadingHospitals?"Loading...":"Search 🔍"}
-              </button>
-            </div>
+            ) : (
+              <button className="btn-login" onClick={() => setShowAuth(true)}>Sign In</button>
+            )}
+          </div>
+        </nav>
 
-            <div style={{display:"flex",gap:12,maxWidth:600}}>
-              <div style={{flex:1,position:"relative"}}>
-                <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:18}}>🔍</span>
-                <input value={searchInput} onChange={e=>setSearchInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setSearch(searchInput);go("list");}}} placeholder="Search hospital by name..." style={{...inp,paddingLeft:44,borderColor:"transparent",background:"rgba(255,255,255,0.95)",borderRadius:12,fontSize:15}}/>
+        <div className="main-content">
+
+          {/* ═══ HOME ═══ */}
+          {view === "home" && <div>
+            <div className="hero">
+              {user && <div className="welcome-badge">👋 Welcome back, {user.displayName || "User"}!</div>}
+              <div className="hero-label">India's AI-Powered Healthcare Platform</div>
+              <h1 className="hero-title">
+                {typedText}<span className="typing-cursor" />
+              </h1>
+              <p className="hero-desc">Search real hospitals powered by Google Places. Book doctors, compare prices, and get AI health predictions — all in one platform.</p>
+
+              <div className="search-row">
+                <div className="search-wrap">
+                  <span className="ico">📍</span>
+                  <input value={cityInput} onChange={e => setCityInput(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchHospitals(cityInput)} placeholder="Enter city (e.g. Mumbai, Delhi)" className="search-field" />
+                </div>
+                <button onClick={() => fetchHospitals(cityInput)} disabled={loadingHospitals} className="hero-search-btn">
+                  {loadingHospitals ? "Searching..." : "Search Hospitals"}
+                </button>
               </div>
-              <button onClick={()=>{setSearch(searchInput);go("list");}} style={btn({background: `var(--bg-card)`,color:"#0F4C81",fontSize:15,padding:"12px 28px",borderRadius:12})}>Search</button>
-            </div>
 
-            <div style={{display:"flex",gap:8,marginTop:16,flexWrap:"wrap"}}>
-              {["Mumbai","Bangalore","Chennai","Hyderabad","Pune"].map(city=><span key={city} onClick={()=>{setCityInput(city);fetchHospitals(city);}} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",color: `var(--bg-card)`,padding:"6px 14px",borderRadius:20,fontSize:13,cursor:"pointer",fontWeight:600}}>{city}</span>)}
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:32}}>
-            {[[hospitals.length||"20+","Hospitals Found","#EFF6FF","#1E88E5"],["120+","Doctors Available","#F0FDF4","#10B981"],["6","Tests to Compare","#FFFBEB","#F59E0B"],["24/7","Emergency Support","#FFF1F2","#EF4444"]].map(([v,l,bg,c])=><div key={l} style={{background:bg,borderRadius:14,padding:20,textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:c}}>{v}</div><div style={{fontSize:12,color: `var(--text-muted)`,fontWeight:600,marginTop:4}}>{l}</div></div>)}
-          </div>
-
-          {!user&&<div style={{background:"linear-gradient(135deg,#0F4C81,#1565C0)",borderRadius:16,padding:"24px 28px",color: `var(--bg-card)`,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-            <div><div style={{fontWeight:800,fontSize:18,marginBottom:6}}>🔐 Sign in to Book Appointments</div><div style={{opacity:0.85,fontSize:14}}>Create a free account to book doctors instantly</div></div>
-            <button onClick={()=>setShowAuth(true)} style={btn({background: `var(--bg-card)`,color:"#0F4C81",padding:"12px 24px"})}>Sign Up Free →</button>
-          </div>}
-
-          {/* Loading / Error */}
-          {loadingHospitals&&<div style={{textAlign:"center",padding:"40px",background: `var(--bg-card)`,borderRadius:16,marginBottom:24}}>
-            <div style={{fontSize:40,marginBottom:12}}>🔍</div>
-            <div style={{fontWeight:700,color:"#0F4C81"}}>Fetching real hospitals from Google...</div>
-          </div>}
-
-          {apiError&&<div style={{background:"#FFF1F2",border:"1px solid #FECDD3",borderRadius:14,padding:"16px 20px",marginBottom:24,color:"#BE123C",fontWeight:600}}>⚠️ {apiError}</div>}
-
-          {/* Featured Hospitals */}
-          {!loadingHospitals&&hospitals.length>0&&<>
-            <div style={{marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center"}}><h2 style={{margin:0,fontSize:20,fontWeight:800}}>🏥 Real Hospitals — {cityInput}</h2><span onClick={()=>go("list")} style={{color:"#1E88E5",cursor:"pointer",fontWeight:700,fontSize:14}}>View All {hospitals.length} →</span></div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16,marginBottom:32}}>
-              {hospitals.slice(0,4).map(h=><div key={h.id} style={card} onClick={()=>go("detail",h)} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow="0 12px 32px rgba(0,0,0,0.12)";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,0.06)";}}>
-                <div style={{background:`linear-gradient(135deg,${h.color}22,${h.color}11)`,padding:"18px 20px",borderBottom:`3px solid ${h.color}30`}}>
-                  <div style={{display:"flex",justifyContent:"space-between"}}><div><div style={{fontWeight:800,fontSize:16,marginBottom:4}}>{h.name}</div><Badge color={`${h.color}18`} text={h.color}>{h.type}</Badge></div><div style={{textAlign:"right"}}><div style={{fontWeight:800,fontSize:18,color:h.color}}>{h.rating} ⭐</div><div style={{fontSize:11,color: `var(--text-muted)`}}>{h.reviews.toLocaleString()} reviews</div></div></div>
+              <div className="search-row">
+                <div className="search-wrap">
+                  <span className="ico">🔍</span>
+                  <input value={searchInput} onChange={e => setSearchInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { setSearch(searchInput); go("list"); } }} placeholder="Search hospital by name..." className="search-field" />
                 </div>
-                <div style={{padding:"14px 20px"}}>
-                  <div style={{fontSize:13,color: `var(--text-muted)`,marginBottom:6}}>📍 {h.address}</div>
-                  {h.phone&&h.phone!=="N/A"&&<div style={{fontSize:13,color: `var(--text-secondary)`,marginBottom:8}}>📞 {h.phone}</div>}
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{h.specialities.slice(0,3).map(sp=><Badge key={sp}>{sp}</Badge>)}</div>
-                </div>
-              </div>)}
+                <button onClick={() => { setSearch(searchInput); go("list"); }} className="hero-search-btn" style={{ background: "#fff", color: "#1e293b" }}>Search</button>
+              </div>
+
+              <div className="city-pills">
+                {["Mumbai", "Bangalore", "Chennai", "Hyderabad", "Pune"].map(c => (
+                  <span key={c} className="city-pill" onClick={() => { setCityInput(c); fetchHospitals(c); }}>{c}</span>
+                ))}
+              </div>
             </div>
-          </>}
 
-          <h2 style={{margin:"0 0 16px",fontSize:20,fontWeight:800}}>🗺️ Hospitals on Map</h2>
-          {hospitals.length>0&&<RealMap hospitals={hospitals.slice(0,10)} onSelect={h=>go("detail",h)}/>}
-          <div style={{textAlign:"center",marginTop:12,marginBottom:24}}><button onClick={()=>go("map")} style={btn({background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,padding:"12px 28px"})}>Open Full Map View →</button></div>
+            {/* Stats */}
+            <div className="stats-row">
+              {[
+                [hospitals.length || 20, "+", "Hospitals Found", "var(--primary)"],
+                [120, "+", "Doctors Available", "var(--success)"],
+                [6, "", "Tests to Compare", "var(--warning)"],
+                ["24/7", "", "Emergency Support", "var(--danger)"],
+              ].map(([v, suf, l, c], i) => (
+                <div key={l} className="stat-card">
+                  <div className="stat-val" style={{ color: c }}>
+                    {typeof v === "number" ? <AnimCounter target={v} suffix={suf} /> : v}
+                  </div>
+                  <div className="stat-lbl">{l}</div>
+                </div>
+              ))}
+            </div>
 
-          <div style={{background: `var(--bg-card)`,borderRadius:16,padding:"24px 28px",color: `var(--text-primary)`,display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,border:"1px solid #E5E7EB",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-            <div><div style={{fontWeight:800,fontSize:18,marginBottom:6}}>🩺 Browse 100+ Specialists</div><div style={{opacity:0.7,fontSize:14}}>Find and book top-rated doctors across all medical fields</div></div>
-            <button onClick={()=>go("doctors")} style={btn({background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,padding:"12px 24px"})}>Find Doctors →</button>
-          </div>
+            {!user && <div className="signin-banner">
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>🔐 Sign in to Book Appointments</div>
+                <div style={{ opacity: 0.85, fontSize: 14 }}>Create a free account to book doctors instantly</div>
+              </div>
+              <button onClick={() => setShowAuth(true)} className="btn btn-white btn-lg">Sign Up Free →</button>
+            </div>}
 
-          <div style={{background:"linear-gradient(135deg,#1B5E20,#388E3C)",borderRadius:16,padding:"24px 28px",color: `var(--bg-card)`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div><div style={{fontWeight:800,fontSize:18,marginBottom:6}}>💊 Compare Test Prices</div><div style={{opacity:0.85,fontSize:14}}>Find the most affordable test across hospitals</div></div>
-            <button onClick={()=>go("compare")} style={btn({background: `var(--bg-card)`,color:"#1B5E20",padding:"12px 24px"})}>Compare Now →</button>
-          </div>
-        </div>}
+            {loadingHospitals && <div className="empty" style={{ marginBottom: 20 }}><div className="empty-ico">🔍</div><div className="empty-title" style={{ color: "var(--primary)" }}>Fetching hospitals from Google...</div></div>}
+            {apiError && <div className="err-box">⚠️ {apiError}</div>}
 
-        {/* =========== HOSPITAL LIST =========== */}
-        {view==="list"&&<div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-            <h2 style={{margin:0,fontWeight:800,fontSize:22}}>Hospitals in {cityInput} <span style={{fontSize:14,color: `var(--text-muted)`,fontWeight:500}}>({hospitals.length} found)</span></h2>
-          </div>
-          <div style={{background: `var(--bg-card)`,borderRadius:14,padding:18,marginBottom:20,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
-            <div style={{flex:1,minWidth:200,position:"relative"}}><span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>🔍</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search hospitals..." style={{...inp,paddingLeft:36}}/></div>
-            <select value={specFilter} onChange={e=>setSpecFilter(e.target.value)} style={{padding:"12px 16px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,background: `var(--bg-card)`,cursor:"pointer",fontFamily:"inherit"}}>{SPECIALITIES.map(sp=><option key={sp}>{sp}</option>)}</select>
-            <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{padding:"12px 16px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,background: `var(--bg-card)`,cursor:"pointer",fontFamily:"inherit"}}><option value="rating">Sort: Best Rated</option><option value="reviews">Sort: Most Reviewed</option></select>
-          </div>
-
-          {loadingHospitals&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16}}><div style={{fontSize:40,marginBottom:12}}>🔍</div><div style={{fontWeight:700,color:"#0F4C81"}}>Loading real hospitals...</div></div>}
-
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {filtered.map(h=><div key={h.id} style={card} onClick={()=>go("detail",h)} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.1)"} onMouseLeave={e=>e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,0.06)"}>
-              <div style={{padding:"18px 22px",display:"flex",gap:16,alignItems:"start"}}>
-                <div style={{width:56,height:56,borderRadius:14,background:`${h.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>🏥</div>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start"}}>
-                    <div>
-                      <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>{h.name}</div>
-                      <div style={{fontSize:13,color: `var(--text-muted)`,marginBottom:6}}>📍 {h.address}</div>
-                      {h.phone&&h.phone!=="N/A"&&<div style={{fontSize:13,color: `var(--text-secondary)`,marginBottom:8}}>📞 {h.phone}</div>}
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}><Badge color={`${h.color}18`} text={h.color}>{h.type}</Badge>{h.openNow&&<Badge color="#F0FDF4" text="#15803D">🟢 Open Now</Badge>}</div>
+            {!loadingHospitals && hospitals.length > 0 && <>
+              <div className="sec-header">
+                <h2 className="sec-title">🏥 Hospitals — {cityInput}</h2>
+                <span className="sec-link" onClick={() => go("list")}>View All {hospitals.length} →</span>
+              </div>
+              <div className="hosp-grid">
+                {hospitals.slice(0, 4).map(h => (
+                  <div key={h.id} className="card card-hover" onClick={() => go("detail", h)} style={{ cursor: "pointer" }}>
+                    <div style={{ padding: "18px 20px", borderBottom: "1px solid var(--border-light)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>{h.name}</div>
+                          <Badge color="blue">{h.type}</Badge>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: "var(--warning)" }}>{h.rating} ⭐</div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{h.reviews.toLocaleString()} reviews</div>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{display:"flex",alignItems:"center",gap:4,justifyContent:"flex-end",marginBottom:4}}><Star rating={h.rating} size={16}/><span style={{fontWeight:800,fontSize:16}}>{h.rating}</span></div>
-                      <div style={{fontSize:12,color: `var(--text-muted)`}}>{h.reviews.toLocaleString()} reviews</div>
-                      <button onClick={e=>{e.stopPropagation();go("detail",h);}} style={btn({background:`linear-gradient(135deg,${h.color},${h.color}99)`,color: `var(--bg-card)`,marginTop:10,padding:"8px 18px",fontSize:13})}>View & Book</button>
+                    <div style={{ padding: "14px 20px" }}>
+                      <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 5 }}>📍 {h.address}</div>
+                      {h.phone && h.phone !== "N/A" && <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>📞 {h.phone}</div>}
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>{h.specialities.slice(0, 3).map(sp => <Badge key={sp} color="gray">{sp}</Badge>)}</div>
                     </div>
                   </div>
-                  <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>{h.specialities.map(sp=><Badge key={sp}>{sp}</Badge>)}</div>
-                </div>
+                ))}
               </div>
-            </div>)}
-            {!loadingHospitals&&filtered.length===0&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16,color: `var(--text-muted)`}}><div style={{fontSize:48,marginBottom:12}}>🔍</div><div style={{fontSize:18,fontWeight:700}}>No hospitals found</div></div>}
-          </div>
-        </div>}
+            </>}
 
-        {/* =========== HOSPITAL DETAIL =========== */}
-        {view==="detail"&&selectedHospital&&<div>
-          <button onClick={()=>go("list")} style={btn({background: `var(--bg-card)`,color: `var(--text-secondary)`,border:"2px solid #E5E7EB",marginBottom:20})}>← Back</button>
-          <div style={{background:`linear-gradient(135deg,${selectedHospital.color},${selectedHospital.color}BB)`,borderRadius:20,padding:32,marginBottom:24,color: `var(--bg-card)`}}>
-            <div style={{display:"flex",gap:20,alignItems:"start"}}>
-              <div style={{fontSize:56}}>🏥</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:26,fontWeight:900,marginBottom:6}}>{selectedHospital.name}</div>
-                <div style={{opacity:0.85,fontSize:14,marginBottom:8}}>📍 {selectedHospital.address}</div>
-                {selectedHospital.phone&&selectedHospital.phone!=="N/A"&&<div style={{opacity:0.9,fontSize:14,marginBottom:12}}>📞 {selectedHospital.phone}</div>}
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{[selectedHospital.type,selectedHospital.openNow?"🟢 Open Now":"🔴 Closed","⏰ "+selectedHospital.timings].map(t=><span key={t} style={{background:"rgba(255,255,255,0.2)",padding:"5px 12px",borderRadius:20,fontSize:13,fontWeight:600}}>{t}</span>)}</div>
-              </div>
-              <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:36,fontWeight:900}}>{selectedHospital.rating}</div><Star rating={selectedHospital.rating} size={18}/><div style={{fontSize:12,opacity:0.8,marginTop:4}}>{selectedHospital.reviews.toLocaleString()} reviews</div></div>
+            <div className="sec-header"><h2 className="sec-title">🗺️ Hospitals on Map</h2></div>
+            {hospitals.length > 0 && <RealMap hospitals={hospitals.slice(0, 10)} onSelect={h => go("detail", h)} />}
+            <div style={{ textAlign: "center", marginTop: 14, marginBottom: 24 }}>
+              <button onClick={() => go("map")} className="btn btn-primary btn-lg">Open Full Map →</button>
             </div>
-          </div>
 
-          <div style={{display:"flex",gap:4,background: `var(--bg-card)`,borderRadius:12,padding:6,marginBottom:20,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-            {["doctors","tests","reviews","location"].map(tab=><button key={tab} onClick={()=>setActiveTab(tab)} style={{flex:1,padding:"10px",borderRadius:8,border:"none",fontWeight:700,fontSize:13,cursor:"pointer",background:activeTab===tab?`linear-gradient(135deg,${selectedHospital.color},${selectedHospital.color}BB)`:"transparent",color:activeTab===tab?"white": `var(--text-muted)`}}>{tab==="doctors"?"👨‍⚕️ Doctors":tab==="tests"?"🧪 Tests":tab==="reviews"?"⭐ Reviews":"📍 Location"}</button>)}
-          </div>
+            <div className="banner">
+              <div><div className="banner-title">🩺 Browse 100+ Specialists</div><div className="banner-desc">Find and book top-rated doctors across all fields</div></div>
+              <button onClick={() => go("doctors")} className="btn btn-primary">Find Doctors →</button>
+            </div>
+            <div className="banner">
+              <div><div className="banner-title">💊 Compare Test Prices</div><div className="banner-desc">Find the most affordable tests across hospitals</div></div>
+              <button onClick={() => go("compare")} className="btn btn-success">Compare Now →</button>
+            </div>
+          </div>}
 
-          {activeTab==="doctors"&&<div>
-            {selectedHospital.doctors.map(doc=><div key={doc.id} style={{...card,cursor:"default",marginBottom:14}}>
-              <div style={{padding:"18px 22px",display:"flex",gap:16,alignItems:"center"}}>
-                <div style={{width:54,height:54,borderRadius:"50%",background:`${selectedHospital.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>👨‍⚕️</div>
-                <div style={{flex:1}}><div style={{fontWeight:800,fontSize:16,marginBottom:3}}>{doc.name}</div><div style={{display:"flex",gap:8,marginBottom:6,flexWrap:"wrap"}}><Badge color={`${selectedHospital.color}14`} text={selectedHospital.color}>{doc.spec}</Badge><Badge color="#FFFBEB" text="#92400E">Available: {doc.available}</Badge></div><Star rating={doc.rating}/></div>
-                <div style={{textAlign:"right",flexShrink:0}}>
-                  <div style={{fontSize:22,fontWeight:900,color:"#0F4C81",marginBottom:4}}>₹{doc.fee}</div>
-                  <button onClick={()=>setBookingDoctor(doc)} style={btn({background:`linear-gradient(135deg,${selectedHospital.color},${selectedHospital.color}BB)`,color: `var(--bg-card)`,padding:"10px 20px"})}>{user?"Book Appointment":"🔐 Login to Book"}</button>
+          {/* ═══ LIST ═══ */}
+          {view === "list" && <div>
+            <div className="sec-header"><h2 className="sec-title">Hospitals in {cityInput} ({hospitals.length})</h2></div>
+            <div className="filter-bar">
+              <div className="filter-wrap"><span className="ico-sm">🔍</span><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search hospitals..." className="f-input" /></div>
+              <select value={specFilter} onChange={e => setSpecFilter(e.target.value)} className="f-select" style={{ maxWidth: 180 }}>{SPECIALITIES.map(sp => <option key={sp}>{sp}</option>)}</select>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="f-select" style={{ maxWidth: 180 }}><option value="rating">Sort: Best Rated</option><option value="reviews">Sort: Most Reviewed</option></select>
+            </div>
+            {loadingHospitals && <div className="empty"><div className="empty-ico">🔍</div><div className="empty-title" style={{ color: "var(--primary)" }}>Loading hospitals...</div></div>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {filtered.map(h => (
+                <div key={h.id} className="card card-hover" onClick={() => go("detail", h)} style={{ cursor: "pointer" }}>
+                  <div style={{ padding: "18px 20px", display: "flex", gap: 14, alignItems: "start" }}>
+                    <div style={{ width: 50, height: 50, borderRadius: 12, background: "var(--primary-50)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>🏥</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{h.name}</div>
+                          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 5 }}>📍 {h.address}</div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <Badge color="blue">{h.type}</Badge>
+                            {h.openNow && <Badge color="green">Open Now</Badge>}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end", marginBottom: 4 }}><Stars rating={h.rating} size={14} /><span style={{ fontWeight: 700, fontSize: 15 }}>{h.rating}</span></div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{h.reviews.toLocaleString()} reviews</div>
+                          <button onClick={e => { e.stopPropagation(); go("detail", h); }} className="btn btn-primary btn-sm" style={{ marginTop: 8 }}>View & Book</button>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 5, flexWrap: "wrap" }}>{h.specialities.map(sp => <Badge key={sp} color="gray">{sp}</Badge>)}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {!loadingHospitals && filtered.length === 0 && <div className="empty"><div className="empty-ico">🔍</div><div className="empty-title">No hospitals found</div></div>}
+            </div>
+          </div>}
+
+          {/* ═══ DETAIL ═══ */}
+          {view === "detail" && selectedHospital && <div>
+            <button onClick={() => go("list")} className="btn btn-ghost" style={{ marginBottom: 16 }}>← Back to list</button>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, var(--primary), #1e40af)", color: "#fff", marginBottom: 20 }}>
+              <div className="bg-ico">🏥</div>
+              <div style={{ display: "flex", gap: 18, alignItems: "start", position: "relative", zIndex: 1 }}>
+                <div style={{ fontSize: 48 }}>🏥</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>{selectedHospital.name}</div>
+                  <div style={{ opacity: 0.8, fontSize: 14, marginBottom: 6 }}>📍 {selectedHospital.address}</div>
+                  {selectedHospital.phone && selectedHospital.phone !== "N/A" && <div style={{ opacity: 0.8, fontSize: 14, marginBottom: 10 }}>📞 {selectedHospital.phone}</div>}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {[selectedHospital.type, selectedHospital.openNow ? "🟢 Open" : "🔴 Closed", "⏰ " + selectedHospital.timings].map(t => (
+                      <span key={t} style={{ background: "rgba(255,255,255,0.15)", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600 }}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 32, fontWeight: 900 }}>{selectedHospital.rating}</div>
+                  <Stars rating={selectedHospital.rating} size={16} />
+                  <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>{selectedHospital.reviews.toLocaleString()} reviews</div>
                 </div>
               </div>
-            </div>)}
-            {!user&&<div style={{background:"#FFF7ED",borderRadius:14,padding:"16px 20px",border:"1px solid #FED7AA",textAlign:"center"}}>
-              <div style={{fontSize:14,color:"#92400E",marginBottom:10}}>🔐 Please login to book appointments</div>
-              <button onClick={()=>setShowAuth(true)} style={btn({background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,padding:"10px 24px"})}>Login / Sign Up</button>
+            </div>
+
+            <div className="tabs">
+              {["doctors", "tests", "reviews", "location"].map(tab => (
+                <button key={tab} className={`tab ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)}>
+                  {tab === "doctors" ? "👨‍⚕️ Doctors" : tab === "tests" ? "🧪 Tests" : tab === "reviews" ? "⭐ Reviews" : "📍 Location"}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === "doctors" && <div>
+              {selectedHospital.doctors.map(doc => (
+                <div key={doc.id} className="card" style={{ marginBottom: 12 }}>
+                  <div style={{ padding: "16px 20px", display: "flex", gap: 14, alignItems: "center" }}>
+                    <div className="doc-av">👨‍⚕️</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>{doc.name}</div>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 5 }}><Badge color="blue">{doc.spec}</Badge><Badge color="orange">Available: {doc.available}</Badge></div>
+                      <Stars rating={doc.rating} />
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 20, fontWeight: 800, color: "var(--success)", marginBottom: 4 }}>₹{doc.fee}</div>
+                      <button onClick={() => { if (!user) { setShowAuth(true); return; } setBookingDoctor(doc); }} className="btn btn-primary btn-sm">{user ? "Book Now" : "🔐 Login"}</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {!user && <div style={{ background: "var(--warning-light)", borderRadius: "var(--radius-md)", padding: "14px 18px", textAlign: "center", marginTop: 10 }}>
+                <div style={{ fontSize: 14, color: "var(--warning)", marginBottom: 8 }}>🔐 Login to book appointments</div>
+                <button onClick={() => setShowAuth(true)} className="btn btn-primary btn-sm">Login / Sign Up</button>
+              </div>}
+            </div>}
+
+            {activeTab === "tests" && <div className="card" style={{ overflow: "hidden" }}>
+              <div style={{ background: "var(--bg-surface)", padding: "12px 20px", fontWeight: 700, fontSize: 14, borderBottom: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                <span>Test Name</span><span style={{ textAlign: "right" }}>Price (₹)</span>
+              </div>
+              {selectedHospital.tests.map((t, i) => (
+                <div key={t.name} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "12px 20px", borderBottom: i < selectedHospital.tests.length - 1 ? "1px solid var(--border-light)" : "none" }}>
+                  <span style={{ fontWeight: 600 }}>🧪 {t.name}</span>
+                  <span style={{ textAlign: "right", fontWeight: 800, color: "var(--success)", fontSize: 15 }}>₹{t.price}</span>
+                </div>
+              ))}
+            </div>}
+
+            {activeTab === "reviews" && <div>
+              <div className="card" style={{ padding: 18, marginBottom: 14 }}>
+                <div style={{ fontWeight: 700, marginBottom: 10 }}>Write a Review</div>
+                <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
+                  {[1, 2, 3, 4, 5].map(s => <span key={s} onClick={() => setReviewRating(s)} style={{ fontSize: 24, cursor: "pointer", color: s <= reviewRating ? "#f59e0b" : "#d1d5db" }}>★</span>)}
+                </div>
+                <textarea value={reviewText} onChange={e => setReviewText(e.target.value)} placeholder="Share your experience..." className="form-input" style={{ minHeight: 70, resize: "vertical", marginBottom: 10 }} />
+                <button onClick={() => submitReview(selectedHospital.id)} className="btn btn-primary btn-sm">Submit Review</button>
+              </div>
+              {loadingReviews && <div style={{ textAlign: "center", padding: 18, color: "var(--text-muted)" }}>Loading reviews...</div>}
+              {hospitalReviews.length > 0 ? hospitalReviews.map(r => (
+                <div key={r.id} className="card" style={{ padding: "14px 18px", marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>👤 {r.userName}</div>
+                    <div><Stars rating={r.rating} size={13} /> <span style={{ fontWeight: 700, fontSize: 13, marginLeft: 3 }}>{r.rating}/5</span></div>
+                  </div>
+                  <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6 }}>{r.text}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>{new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+                </div>
+              )) : (!loadingReviews && <div className="empty" style={{ padding: 24 }}><div style={{ color: "var(--text-muted)" }}>No reviews yet.</div></div>)}
+            </div>}
+
+            {activeTab === "location" && <div>
+              <RealMap hospitals={[selectedHospital]} onSelect={() => { }} />
+              <div className="card" style={{ padding: "14px 18px", marginTop: 14 }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>📍 {selectedHospital.name}</div>
+                <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 12 }}>{selectedHospital.address}</div>
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedHospital.lat},${selectedHospital.lng}`} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ display: "block", textAlign: "center" }}>🗺️ Get Directions</a>
+              </div>
             </div>}
           </div>}
 
-          {activeTab==="tests"&&<div style={{background: `var(--bg-card)`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{background:"#F8FAFC",padding:"14px 22px",fontWeight:800,fontSize:15,borderBottom:"1px solid #E5E7EB",display:"grid",gridTemplateColumns:"1fr 1fr"}}><span>Test Name</span><span style={{textAlign:"right"}}>Price (₹)</span></div>
-            {selectedHospital.tests.map((t,i)=><div key={t.name} style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:"14px 22px",borderBottom:i<selectedHospital.tests.length-1?"1px solid #F1F5F9":"none",background:i%2===0?"white":"#FAFAFA"}}><span style={{fontWeight:600}}>🧪 {t.name}</span><span style={{textAlign:"right",fontWeight:800,color:"#059669",fontSize:16}}>₹{t.price}</span></div>)}
-          </div>}
-
-          {activeTab==="reviews"&&<div>
-            <div style={{background: `var(--bg-card)`,borderRadius:16,padding:20,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-              <div style={{fontWeight:700,marginBottom:12,fontSize:15}}>Write a Review</div>
-              <div style={{display:"flex",gap:6,marginBottom:12}}>{[1,2,3,4,5].map(st=><span key={st} onClick={()=>setReviewRating(st)} style={{fontSize:28,cursor:"pointer",color:st<=reviewRating?"#F59E0B":"#D1D5DB"}}>★</span>)}</div>
-              <textarea value={reviewText} onChange={e=>setReviewText(e.target.value)} placeholder="Share your experience..." style={{...inp,minHeight:80,resize:"vertical"}}/>
-              <button onClick={()=>submitReview(selectedHospital.id,selectedHospital.name)} style={btn({background:`linear-gradient(135deg,${selectedHospital.color},${selectedHospital.color}99)`,color: `var(--bg-card)`,marginTop:10})}>Submit Review</button>
-            </div>
-            {/* 🆕 Show reviews fetched from backend */}
-            {loadingReviews&&<div style={{textAlign:"center",padding:20,color: `var(--text-muted)`}}>Loading reviews...</div>}
-            {hospitalReviews.length>0?hospitalReviews.map(r=>(
-              <div key={r.id} style={{background: `var(--bg-card)`,borderRadius:14,padding:"16px 20px",marginBottom:10,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                  <div style={{fontWeight:700,fontSize:14}}>👤 {r.userName}</div>
-                  <div><Star rating={r.rating} size={14}/> <span style={{fontWeight:700,fontSize:13,marginLeft:4}}>{r.rating}/5</span></div>
-                </div>
-                <div style={{fontSize:14,color: `var(--text-secondary)`,lineHeight:1.6}}>{r.text}</div>
-                <div style={{fontSize:11,color: `var(--text-muted)`,marginTop:8}}>{new Date(r.createdAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+          {/* ═══ COMPARE ═══ */}
+          {view === "compare" && <div>
+            <h2 className="sec-title" style={{ marginBottom: 6 }}>🧪 Test Price Comparison</h2>
+            <p style={{ margin: "0 0 20px", color: "var(--text-muted)" }}>Select tests to compare across hospitals</p>
+            <div className="card" style={{ padding: 18, marginBottom: 20 }}>
+              <div style={{ fontWeight: 700, marginBottom: 10 }}>Select Tests</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {ALL_TESTS.map(t => <button key={t} onClick={() => toggleTest(t)} className={`tpill ${selectedTests.includes(t) ? "on" : ""}`}>{selectedTests.includes(t) ? "✓ " : ""}{t}</button>)}
               </div>
-            )):(!loadingReviews&&<div style={{textAlign:"center",padding:"30px",background: `var(--bg-card)`,borderRadius:14,color: `var(--text-muted)`}}>No reviews yet. Be the first to review!</div>)}
+            </div>
+            {selectedTests.length > 0 && hospitals.length > 0 && <div className="card" style={{ overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" }}>
+                <table className="cmp-table">
+                  <thead><tr><th>Test</th>{hospitals.slice(0, 5).map(h => <th key={h.id} style={{ textAlign: "center", minWidth: 120 }}>{h.name.split(" ").slice(0, 2).join(" ")}</th>)}</tr></thead>
+                  <tbody>{selectedTests.map(test => {
+                    const prices = hospitals.slice(0, 5).map(h => h.tests.find(t => t.name === test)?.price).filter(Boolean);
+                    const mn = Math.min(...prices), mx = Math.max(...prices);
+                    return <tr key={test}>
+                      <td style={{ fontWeight: 700 }}>🧪 {test}</td>
+                      {hospitals.slice(0, 5).map(h => { const td = h.tests.find(t => t.name === test); if (!td) return <td key={h.id} style={{ textAlign: "center", color: "var(--text-muted)" }}>—</td>; return <td key={h.id} style={{ textAlign: "center" }}><div className={`price ${td.price === mn ? "low" : td.price === mx ? "high" : ""}`}>₹{td.price}</div>{td.price === mn && <div style={{ fontSize: 10, fontWeight: 700, color: "var(--success)" }}>✓ CHEAPEST</div>}</td>; })}
+                    </tr>;
+                  })}</tbody>
+                </table>
+              </div>
+              <div style={{ padding: "12px 18px", background: "var(--bg-surface)", fontSize: 12, color: "var(--text-muted)", borderTop: "1px solid var(--border-light)" }}>
+                <span style={{ color: "var(--success)", fontWeight: 700 }}>Green</span> = Cheapest · <span style={{ color: "var(--danger)", fontWeight: 700 }}>Red</span> = Most Expensive
+              </div>
+            </div>}
           </div>}
 
-          {activeTab==="location"&&<div>
-            <RealMap hospitals={[selectedHospital]} onSelect={()=>{}}/>
-            <div style={{background: `var(--bg-card)`,borderRadius:14,padding:"16px 20px",marginTop:16,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-              <div style={{fontWeight:700,marginBottom:8}}>📍 {selectedHospital.name}</div>
-              <div style={{fontSize:14,color: `var(--text-muted)`,marginBottom:14}}>{selectedHospital.address}</div>
-              <a href={`https://www.google.com/maps/dir/?api=1&destination=${selectedHospital.lat},${selectedHospital.lng}`} target="_blank" rel="noreferrer" style={{display:"block",padding:"12px",borderRadius:12,background:"#1E88E5",color: `var(--bg-card)`,fontWeight:700,textAlign:"center",textDecoration:"none",fontSize:14}}>🗺️ Get Directions on Google Maps</a>
+          {/* ═══ MAP ═══ */}
+          {view === "map" && <div>
+            <h2 className="sec-title" style={{ marginBottom: 6 }}>🗺️ Hospital Map — {cityInput}</h2>
+            <p style={{ margin: "0 0 16px", color: "var(--text-muted)" }}>Click any marker for details</p>
+            {hospitals.length > 0 && <RealMap hospitals={hospitals.slice(0, 15)} onSelect={h => go("detail", h)} />}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10, marginTop: 16 }}>
+              {hospitals.slice(0, 6).map(h => (
+                <div key={h.id} className="card card-hover" onClick={() => go("detail", h)} style={{ padding: "12px 14px", display: "flex", gap: 10, alignItems: "center", cursor: "pointer" }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--primary-50)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🏥</div>
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 13 }}>{h.name}</div><div style={{ fontSize: 12, color: "var(--text-muted)" }}>⭐ {h.rating} · {h.reviews.toLocaleString()}</div></div>
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="btn btn-outline btn-sm">Directions</a>
+                </div>
+              ))}
             </div>
           </div>}
-        </div>}
 
-        {/* =========== COMPARE =========== */}
-        {view==="compare"&&<div>
-          <h2 style={{margin:"0 0 8px",fontWeight:800,fontSize:22}}>🧪 Test Price Comparison</h2>
-          <p style={{margin:"0 0 24px",color: `var(--text-muted)`}}>Select tests to compare prices across hospitals</p>
-          <div style={{background: `var(--bg-card)`,borderRadius:14,padding:20,marginBottom:24,boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-            <div style={{fontWeight:700,marginBottom:12}}>Select Tests</div>
-            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{ALL_TESTS.map(t=><button key={t} onClick={()=>toggleTest(t)} style={{padding:"8px 16px",borderRadius:20,border:selectedTests.includes(t)?"2px solid #1E88E5":"2px solid #E5E7EB",background:selectedTests.includes(t)?"#EFF6FF": `var(--bg-card)`,color:selectedTests.includes(t)?"#1E88E5": `var(--text-secondary)`,fontWeight:selectedTests.includes(t)?700:500,fontSize:13,cursor:"pointer"}}>{selectedTests.includes(t)?"✓ ":""}{t}</button>)}</div>
-          </div>
-          {selectedTests.length>0&&hospitals.length>0&&<div style={{background: `var(--bg-card)`,borderRadius:16,overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.08)"}}>
-            <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr style={{background:"linear-gradient(135deg,#0F4C81,#1565C0)"}}><th style={{padding:"16px 20px",textAlign:"left",color: `var(--bg-card)`,fontSize:14,fontWeight:700}}>Test Name</th>{hospitals.slice(0,5).map(h=><th key={h.id} style={{padding:"16px 20px",textAlign:"center",color: `var(--bg-card)`,fontSize:13,fontWeight:700,minWidth:130}}>{h.name.split(" ").slice(0,2).join(" ")}</th>)}</tr></thead>
-              <tbody>{selectedTests.map((test,ti)=>{
-                const prices=hospitals.slice(0,5).map(h=>h.tests.find(t=>t.name===test)?.price).filter(Boolean);
-                const mn=Math.min(...prices),mx=Math.max(...prices);
-                return<tr key={test} style={{background:ti%2===0?"white":"#F8FAFC",borderBottom:"1px solid #F1F5F9"}}>
-                  <td style={{padding:"14px 20px",fontWeight:700}}>🧪 {test}</td>
-                  {hospitals.slice(0,5).map(h=>{const td=h.tests.find(t=>t.name===test);if(!td)return<td key={h.id} style={{padding:"14px 20px",textAlign:"center",color:"#D1D5DB"}}>—</td>;return<td key={h.id} style={{padding:"14px 20px",textAlign:"center"}}><div style={{fontWeight:800,fontSize:16,color:td.price===mn?"#059669":td.price===mx?"#DC2626": `var(--text-primary)`}}>₹{td.price}</div>{td.price===mn&&<div style={{fontSize:10,fontWeight:700,color:"#059669"}}>✓ CHEAPEST</div>}</td>;})}
-                </tr>;
-              })}</tbody>
-            </table></div>
-            <div style={{padding:"14px 20px",background:"#FFFBEB",fontSize:13,color:"#92400E"}}><span style={{color:"#059669",fontWeight:700}}>Green</span> = Cheapest · <span style={{color:"#DC2626",fontWeight:700}}>Red</span> = Most Expensive</div>
-          </div>}
-        </div>}
-
-        {/* =========== MAP =========== */}
-        {view==="map"&&<div>
-          <h2 style={{margin:"0 0 8px",fontWeight:800,fontSize:22}}>🗺️ Hospital Map — {cityInput}</h2>
-          <p style={{margin:"0 0 20px",color: `var(--text-muted)`}}>Click on any marker to view details and get directions</p>
-          {hospitals.length>0&&<RealMap hospitals={hospitals.slice(0,15)} onSelect={h=>go("detail",h)}/>}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginTop:20}}>
-            {hospitals.slice(0,6).map(h=><div key={h.id} onClick={()=>go("detail",h)} style={{background: `var(--bg-card)`,borderRadius:14,padding:"14px 16px",cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.06)",display:"flex",gap:12,alignItems:"center"}} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"} onMouseLeave={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.06)"}>
-              <div style={{width:42,height:42,borderRadius:10,background:`${h.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🏥</div>
-              <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>{h.name}</div><div style={{fontSize:12,color: `var(--text-muted)`}}>⭐ {h.rating} · {h.reviews.toLocaleString()} reviews</div></div>
-              <a href={`https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lng}`} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{background:"#EFF6FF",color:"#1E88E5",padding:"6px 12px",borderRadius:8,fontSize:12,fontWeight:700,textDecoration:"none"}}>Directions</a>
-            </div>)}
-          </div>
-        </div>}
-
-        {/* =========== 🆕 MY APPOINTMENTS =========== */}
-        {view==="appointments"&&<div>
-          <h2 style={{margin:"0 0 8px",fontWeight:800,fontSize:22}}>📋 My Appointments</h2>
-          <p style={{margin:"0 0 20px",color: `var(--text-muted)`}}>Track and manage your booked appointments</p>
-
-          {loadingAppts&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16}}><div style={{fontSize:40,marginBottom:12}}>📋</div><div style={{fontWeight:700,color:"#0F4C81"}}>Loading your appointments...</div></div>}
-
-          {!loadingAppts&&myAppointments.length===0&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:64,marginBottom:16}}>📅</div>
-            <div style={{fontSize:20,fontWeight:800,color: `var(--text-secondary)`,marginBottom:8}}>No Appointments Yet</div>
-            <div style={{fontSize:14,color: `var(--text-muted)`,marginBottom:20}}>Book your first appointment from the hospital list</div>
-            <button onClick={()=>go("list")} style={btn({background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,padding:"12px 28px",borderRadius:12})}>Find Hospitals →</button>
-          </div>}
-
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {myAppointments.map(apt=>(
-              <div key={apt.id} style={{...card,cursor:"default"}}>
-                <div style={{padding:"18px 22px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:12}}>
-                    <div>
-                      <div style={{fontWeight:800,fontSize:17,marginBottom:4}}>👨‍⚕️ {apt.doctorName}</div>
-                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                        <Badge color="#EFF6FF" text="#1D4ED8">{apt.doctorSpec}</Badge>
-                        <Badge color={apt.status==="Confirmed"?"#F0FDF4":apt.status==="Cancelled"?"#FFF1F2":"#FFFBEB"} text={apt.status==="Confirmed"?"#15803D":apt.status==="Cancelled"?"#BE123C":"#92400E"}>{apt.status==="Confirmed"?"✅":apt.status==="Cancelled"?"❌":"📅"} {apt.status}</Badge>
+          {/* ═══ APPOINTMENTS ═══ */}
+          {view === "appointments" && <div>
+            <h2 className="sec-title" style={{ marginBottom: 6 }}>📋 My Appointments</h2>
+            <p style={{ margin: "0 0 16px", color: "var(--text-muted)" }}>Track and manage your bookings</p>
+            {loadingAppts && <div className="empty"><div className="empty-ico">📋</div><div className="empty-title" style={{ color: "var(--primary)" }}>Loading appointments...</div></div>}
+            {!loadingAppts && myAppointments.length === 0 && <div className="empty"><div className="empty-ico">📅</div><div className="empty-title">No Appointments Yet</div><div className="empty-desc">Book your first appointment</div><button onClick={() => go("list")} className="btn btn-primary btn-lg">Find Hospitals →</button></div>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {myAppointments.map(apt => (
+                <div key={apt.id} className="appt-card">
+                  <div className="appt-body">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>👨‍⚕️ {apt.doctorName}</div>
+                        <div style={{ display: "flex", gap: 6 }}><Badge color="blue">{apt.doctorSpec}</Badge><Badge color={apt.status === "Confirmed" ? "green" : apt.status === "Cancelled" ? "red" : "orange"}>{apt.status}</Badge></div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "var(--primary)" }}>₹{apt.fee}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Fee</div>
                       </div>
                     </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:20,fontWeight:900,color:"#0F4C81"}}>₹{apt.fee}</div>
-                      <div style={{fontSize:11,color: `var(--text-muted)`}}>Consultation Fee</div>
-                    </div>
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,background:"#F8FAFC",borderRadius:12,padding:14,marginBottom:12}}>
-                    {[["🏥 Hospital",apt.hospitalName],["📅 Date",apt.date],["🕐 Time",apt.time],["👤 Patient",apt.patientName]].map(([k,v])=><div key={k}><div style={{fontSize:11,color: `var(--text-muted)`,marginBottom:2}}>{k}</div><div style={{fontSize:13,fontWeight:600}}>{v}</div></div>)}
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:11,color: `var(--text-muted)`}}>ID: <strong>{apt.id}</strong> · Booked: {new Date(apt.bookedAt).toLocaleDateString("en-IN")}</div>
-                    <div style={{display:"flex",gap:8}}>
-                      {apt.status==="Confirmed"&&<button onClick={()=>setCallRoom(apt.id)} style={btn({background:"#EFF6FF",color:"#1D4ED8",border:"1px solid #BFDBFE",fontSize:12,padding:"6px 14px"})}>📹 Join Call</button>}
-                      {apt.status==="Confirmed"&&<button onClick={()=>cancelAppointment(apt.id)} style={btn({background:"#FFF1F2",color:"#BE123C",border:"1px solid #FECDD3",fontSize:12,padding:"6px 14px"})}>Cancel ✕</button>}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>}
-
-        {/* =========== 🆕 EMERGENCY SOS =========== */}
-        {view==="emergency"&&<div>
-          <div style={{background:"linear-gradient(135deg,#DC2626,#BE123C)",borderRadius:20,padding:"36px 32px",marginBottom:28,color: `var(--bg-card)`,textAlign:"center",position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:30,top:-10,fontSize:100,opacity:0.1}}>🚨</div>
-            <div style={{fontSize:48,marginBottom:12}}>🆘</div>
-            <h1 style={{margin:"0 0 8px",fontSize:28,fontWeight:900}}>Emergency Services</h1>
-            <p style={{margin:0,opacity:0.9,fontSize:15}}>One tap to call emergency services. Stay calm, help is on the way.</p>
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16}}>
-            {EMERGENCY_CONTACTS.map(ec=>(
-              <div key={ec.number} style={{background: `var(--bg-card)`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",transition:"transform 0.2s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-3px)"} onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-                <div style={{background:`${ec.color}11`,padding:"16px 20px",borderBottom:`3px solid ${ec.color}25`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    <div style={{width:48,height:48,borderRadius:14,background:`${ec.color}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>{ec.icon}</div>
-                    <div>
-                      <div style={{fontWeight:800,fontSize:16}}>{ec.name}</div>
-                      <div style={{fontSize:12,color: `var(--text-muted)`}}>{ec.desc}</div>
-                    </div>
-                  </div>
-                </div>
-                <div style={{padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontSize:24,fontWeight:900,color:ec.color}}>{ec.number}</div>
-                  <a href={`tel:${ec.number}`} style={{background:`linear-gradient(135deg,${ec.color},${ec.color}BB)`,color: `var(--bg-card)`,padding:"10px 20px",borderRadius:12,fontSize:14,fontWeight:700,textDecoration:"none",display:"flex",alignItems:"center",gap:6}}>📞 Call Now</a>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{background:"linear-gradient(135deg,#1B5E20,#388E3C)",borderRadius:16,padding:"24px 28px",color: `var(--bg-card)`,marginTop:24,textAlign:"center"}}>
-            <div style={{fontWeight:800,fontSize:18,marginBottom:6}}>🏥 Need a Hospital?</div>
-            <div style={{opacity:0.85,fontSize:14,marginBottom:16}}>Find the nearest hospital and get directions instantly</div>
-            <button onClick={()=>go("map")} style={btn({background: `var(--bg-card)`,color:"#1B5E20",padding:"12px 28px"})}>Open Map → Find Nearest Hospital</button>
-          </div>
-        </div>}
-
-        {/* =========== 🆕 HEALTH TIPS =========== */}
-        {view==="tips"&&<div>
-          <div style={{background:"linear-gradient(135deg,#059669,#10B981)",borderRadius:20,padding:"36px 32px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:30,top:-10,fontSize:100,opacity:0.1}}>💡</div>
-            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:8,textTransform:"uppercase"}}>PulseRATE Tips</div>
-            <h1 style={{margin:"0 0 8px",fontSize:28,fontWeight:900}}>Health Tips & Awareness</h1>
-            <p style={{margin:0,opacity:0.9,fontSize:15,maxWidth:500}}>Curated health tips to help you live a healthier, happier life.</p>
-          </div>
-
-          <div style={{display:"flex",gap:8,marginBottom:24,flexWrap:"wrap"}}>
-            {["All","Prevention","Nutrition","Mental Health","First Aid","Fitness","Hygiene","Sleep","Hydration"].map(cat=>(
-              <button key={cat} onClick={()=>setTipsFilter(cat)} style={{padding:"8px 16px",borderRadius:20,border:tipsFilter===cat?"2px solid #059669":"2px solid #E5E7EB",background:tipsFilter===cat?"#F0FDF4": `var(--bg-card)`,color:tipsFilter===cat?"#059669": `var(--text-muted)`,fontWeight:tipsFilter===cat?700:500,fontSize:13,cursor:"pointer"}}>{cat}</button>
-            ))}
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16}}>
-            {HEALTH_TIPS.filter(t=>tipsFilter==="All"||t.category===tipsFilter).map(tip=>(
-              <div key={tip.id} style={{background: `var(--bg-card)`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",transition:"transform 0.2s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-3px)"} onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-                <div style={{background:`${tip.color}11`,padding:"18px 20px",borderBottom:`3px solid ${tip.color}25`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                    <div style={{fontSize:28}}>{tip.icon}</div>
-                    <Badge color={`${tip.color}18`} text={tip.color}>{tip.category}</Badge>
-                  </div>
-                  <div style={{fontWeight:800,fontSize:17}}>{tip.title}</div>
-                </div>
-                <div style={{padding:"16px 20px"}}>
-                  <div style={{fontSize:14,color: `var(--text-secondary)`,lineHeight:1.7,marginBottom:12}}>{tip.desc}</div>
-                  <div style={{background:`${tip.color}10`,borderRadius:10,padding:"10px 14px",fontSize:13,color:tip.color,fontWeight:600}}>💡 {tip.tip}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>}
-
-        {/* =========== 🤖 AI HEALTH CHECKUP =========== */}
-        {view==="ai-checkup"&&<div>
-          {/* Hero Banner */}
-          <div style={{background:"linear-gradient(135deg,#4338CA,#6D28D9,#7C3AED)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.08}}>🧠</div>
-            <div style={{position:"absolute",left:-30,bottom:-30,width:120,height:120,borderRadius:"50%",background:"rgba(255,255,255,0.05)"}}></div>
-            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:10,textTransform:"uppercase"}}>AI-Powered Health Screening</div>
-            <h1 style={{margin:"0 0 10px",fontSize:32,fontWeight:900,lineHeight:1.2}}>🤖 AI Health Checkup</h1>
-            <p style={{margin:"0 0 16px",opacity:0.85,fontSize:15,maxWidth:550}}>Get instant AI predictions for Heart Disease, Breast Cancer, and Diabetes using machine learning models trained on real medical data.</p>
-            <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
-              {[["3","ML Models"],["99%+","Accuracy"],["<1s","Prediction"],["Free","Always"]].map(([v,l])=><div key={l} style={{background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"8px 16px",textAlign:"center"}}><div style={{fontWeight:900,fontSize:18}}>{v}</div><div style={{fontSize:11,opacity:0.7}}>{l}</div></div>)}
-            </div>
-          </div>
-
-          {/* Medical Disclaimer */}
-          <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:14,padding:"14px 20px",marginBottom:24,display:"flex",gap:12,alignItems:"center"}}>
-            <span style={{fontSize:24}}>⚠️</span>
-            <div><div style={{fontWeight:700,fontSize:13,color:"#92400E",marginBottom:2}}>Medical Disclaimer</div><div style={{fontSize:12,color:"#A16207"}}>This AI tool is for screening purposes only and does NOT replace professional medical diagnosis. Always consult a qualified doctor for health decisions.</div></div>
-          </div>
-
-          {aiModelsLoading&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16}}><div style={{fontSize:40,marginBottom:12}}>🧠</div><div style={{fontWeight:700,color:"#4338CA"}}>Loading AI Models...</div></div>}
-
-          {!aiModelsLoading&&!aiModels&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:64,marginBottom:16}}>🔌</div>
-            <div style={{fontSize:20,fontWeight:800,color: `var(--text-secondary)`,marginBottom:8}}>ML Server Not Connected</div>
-            <div style={{fontSize:14,color: `var(--text-muted)`,marginBottom:20,maxWidth:400,margin:"0 auto 20px"}}>Start the Python ML server to use AI predictions:<br/><code style={{background: `var(--bg-main)`,padding:"4px 12px",borderRadius:6,fontSize:13}}>cd healthconnect-ml && python app.py</code></div>
-            <button onClick={fetchAiModels} style={{padding:"12px 28px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#4338CA,#6D28D9)",color: `var(--bg-card)`,fontWeight:700,fontSize:14,cursor:"pointer"}}>Retry Connection 🔄</button>
-          </div>}
-
-          {aiModels&&<>
-            {/* Disease Selector */}
-            {!aiDisease&&<>
-              <h2 style={{margin:"0 0 16px",fontSize:20,fontWeight:800}}>Select a Health Check</h2>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
-                {[
-                  ["heart","❤️","Heart Disease","Analyze 13 cardiac parameters to predict heart disease risk","#DC2626","#FFF1F2"],
-                  ["cancer","🎗️","Breast Cancer","Evaluate 30 tumor measurements for malignancy prediction","#DB2777","#FDF2F8"],
-                  ["diabetes","🩺","Diabetes","Assess 8 diagnostic measures for Type 2 diabetes risk","#7C3AED","#F5F3FF"],
-                ].map(([key,icon,title,desc,color,bg])=>(
-                  <div key={key} onClick={()=>selectDisease(key)} style={{background: `var(--bg-card)`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",cursor:"pointer",transition:"all 0.25s",border:`2px solid transparent`}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-6px)";e.currentTarget.style.boxShadow="0 16px 40px rgba(0,0,0,0.12)";e.currentTarget.style.borderColor=color;}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,0.06)";e.currentTarget.style.borderColor="transparent";}}>
-                    <div style={{background:bg,padding:"24px 20px",textAlign:"center",borderBottom:`3px solid ${color}25`}}>
-                      <div style={{fontSize:48,marginBottom:8}}>{icon}</div>
-                      <div style={{fontWeight:900,fontSize:18,color}}>{title}</div>
-                    </div>
-                    <div style={{padding:"16px 20px"}}>
-                      <div style={{fontSize:13,color: `var(--text-muted)`,lineHeight:1.6,marginBottom:12}}>{desc}</div>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <Badge color={`${color}15`} text={color}>{aiModels[key]?.model_used}</Badge>
-                        <span style={{fontSize:12,color: `var(--text-muted)`}}>AUC: {aiModels[key]?.test_auc}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>}
-
-            {/* Input Form + Results */}
-            {aiDisease&&aiModels[aiDisease]&&<>
-              <button onClick={()=>{setAiDisease(null);setAiResult(null);setAiForm({});}} style={{padding:"10px 20px",borderRadius:10,border:"2px solid #E5E7EB",background: `var(--bg-card)`,color: `var(--text-secondary)`,fontWeight:700,cursor:"pointer",fontSize:14,marginBottom:20}}>← Back to Selection</button>
-
-              <div style={{display:"grid",gridTemplateColumns:aiResult?"1fr 1fr":"1fr",gap:24}}>
-                {/* Form Panel */}
-                <div style={{background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-                  <div style={{background:aiDisease==="heart"?"linear-gradient(135deg,#DC2626,#EF4444)":aiDisease==="cancer"?"linear-gradient(135deg,#DB2777,#EC4899)":"linear-gradient(135deg,#7C3AED,#8B5CF6)",padding:"18px 22px",color: `var(--bg-card)`}}>
-                    <div style={{fontSize:24,marginBottom:4}}>{aiModels[aiDisease].icon} {aiModels[aiDisease].name}</div>
-                    <div style={{fontSize:12,opacity:0.85}}>Fill in the values below and click Predict</div>
-                  </div>
-                  <div style={{padding:"20px 22px",maxHeight:"60vh",overflowY:"auto"}}>
-                    <div style={{display:"grid",gridTemplateColumns:aiModels[aiDisease].features.length>10?"1fr 1fr":"1fr",gap:14}}>
-                      {aiModels[aiDisease].features.map(f=>(
-                        <div key={f.name}>
-                          <label style={{fontSize:12,fontWeight:600,color: `var(--text-secondary)`,display:"block",marginBottom:4}}>{f.label}</label>
-                          {f.type==="select"?(
-                            <select value={aiForm[f.name]||""} onChange={e=>setAiForm(p=>({...p,[f.name]:parseFloat(e.target.value)}))} style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"2px solid #E5E7EB",fontSize:13,background: `var(--bg-card)`,cursor:"pointer",fontFamily:"inherit"}}>
-                              <option value="">Select...</option>
-                              {f.options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
-                          ):(
-                            <input type="number" step={f.step||1} min={f.min} max={f.max} value={aiForm[f.name]||""} onChange={e=>setAiForm(p=>({...p,[f.name]:parseFloat(e.target.value)||0}))} placeholder={f.placeholder||""} style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"2px solid #E5E7EB",fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-                          )}
-                          {f.hint&&<div style={{fontSize:10,color: `var(--text-muted)`,marginTop:2}}>{f.hint}</div>}
-                        </div>
+                    <div className="appt-grid">
+                      {[["🏥 Hospital", apt.hospitalName], ["📅 Date", apt.date], ["🕐 Time", apt.time], ["👤 Patient", apt.patientName]].map(([k, v]) => (
+                        <div key={k} className="appt-grid-item"><div className="k">{k}</div><div className="v">{v}</div></div>
                       ))}
                     </div>
-                    <button onClick={runPrediction} disabled={aiLoading} style={{width:"100%",marginTop:20,padding:"14px",borderRadius:12,border:"none",background:aiLoading?"#94A3B8":aiDisease==="heart"?"linear-gradient(135deg,#DC2626,#EF4444)":aiDisease==="cancer"?"linear-gradient(135deg,#DB2777,#EC4899)":"linear-gradient(135deg,#7C3AED,#8B5CF6)",color: `var(--bg-card)`,fontWeight:800,fontSize:16,cursor:aiLoading?"not-allowed":"pointer"}}>
-                      {aiLoading?"🧠 Analyzing...":"🔬 Run AI Prediction"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Results Panel */}
-                {aiResult&&<div id="ai-report" style={{display:"flex",flexDirection:"column",gap:16,background: `var(--bg-card)`,padding:24,borderRadius:16}}>
-                  {/* Main Result Card */}
-                  <div style={{background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",overflow:"hidden"}}>
-                    <div style={{background:aiResult.risk_level==="HIGH"?"linear-gradient(135deg,#DC2626,#EF4444)":aiResult.risk_level==="MODERATE"?"linear-gradient(135deg,#D97706,#F59E0B)":"linear-gradient(135deg,#059669,#10B981)",padding:"24px",color: `var(--bg-card)`,textAlign:"center"}}>
-                      <div style={{fontSize:56,marginBottom:8}}>{aiResult.risk_level==="HIGH"?"🔴":aiResult.risk_level==="MODERATE"?"🟡":"🟢"}</div>
-                      <div style={{fontSize:22,fontWeight:900,marginBottom:4}}>{aiResult.label}</div>
-                      <div style={{fontSize:14,opacity:0.9}}>{aiResult.risk_level} RISK</div>
-                    </div>
-                    <div style={{padding:"20px 24px"}}>
-                      {/* Probability Gauge */}
-                      <div style={{marginBottom:16}}>
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:600,marginBottom:6}}><span>Probability</span><span>{(aiResult.probability*100).toFixed(1)}%</span></div>
-                        <div style={{height:10,background: `var(--bg-main)`,borderRadius:10,overflow:"hidden"}}>
-                          <div style={{height:"100%",width:`${aiResult.probability*100}%`,background:aiResult.risk_level==="HIGH"?"linear-gradient(90deg,#DC2626,#EF4444)":aiResult.risk_level==="MODERATE"?"linear-gradient(90deg,#D97706,#F59E0B)":"linear-gradient(90deg,#059669,#10B981)",borderRadius:10,transition:"width 1s ease"}}></div>
-                        </div>
-                      </div>
-                      {/* Stats */}
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-                        {[["Confidence",`${(aiResult.confidence*100).toFixed(1)}%`],["Model",aiResult.model_used]].map(([k,v])=><div key={k} style={{background:"#F8FAFC",borderRadius:10,padding:"12px 14px",textAlign:"center"}}><div style={{fontSize:11,color: `var(--text-muted)`,marginBottom:2}}>{k}</div><div style={{fontWeight:800,fontSize:15,color: `var(--text-primary)`}}>{v}</div></div>)}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>ID: {apt.id} · {new Date(apt.bookedAt).toLocaleDateString("en-IN")}</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {apt.status === "Confirmed" && <button onClick={() => setCallRoom(apt.id)} className="btn btn-outline btn-sm">📹 Call</button>}
+                        {apt.status === "Confirmed" && <button onClick={() => cancelAppointment(apt.id)} className="btn btn-sm" style={{ background: "var(--danger-light)", color: "var(--danger)", border: "1px solid #fecaca" }}>Cancel</button>}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Recommendation */}
-                  <div style={{background: `var(--bg-card)`,borderRadius:16,padding:"18px 22px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-                    <div style={{fontWeight:800,fontSize:15,marginBottom:8,color: `var(--text-primary)`}}>📋 Recommendation</div>
-                    <div style={{fontSize:14,color: `var(--text-secondary)`,lineHeight:1.7}}>{aiResult.recommendation}</div>
-                  </div>
-
-                  {/* Disclaimer */}
-                  <div style={{background:"#FFF1F2",border:"1px solid #FECDD3",borderRadius:12,padding:"12px 16px"}}>
-                    <div style={{fontSize:12,color:"#BE123C",fontWeight:600}}>⚠️ This is an AI screening result, NOT a medical diagnosis. Please consult a qualified healthcare professional for proper evaluation and treatment.</div>
-                  </div>
-
-                  {/* 🏥 Smart Doctor Booking */}
-                  {(aiResult.risk_level==="HIGH"||aiResult.risk_level==="MODERATE")&&<button onClick={()=>bookSpecialist(aiDisease)} style={{padding:"14px 20px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,fontWeight:800,cursor:"pointer",fontSize:15,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                    🏥 Book a {aiDisease==="heart"?"Cardiologist":aiDisease==="cancer"?"Oncologist":"Doctor"} Now
-                  </button>}
-
-                  {/* Try Again / Download PDF */}
-                  <div style={{display:"flex",gap:12}}>
-                    <button onClick={()=>{setAiResult(null);setAiForm({});}} style={{flex:1,padding:"12px 20px",borderRadius:12,border:"2px solid #E5E7EB",background: `var(--bg-card)`,color: `var(--text-secondary)`,fontWeight:700,cursor:"pointer",fontSize:14}}>🔄 New Prediction</button>
-                    <button onClick={()=>downloadPDF("ai-report", "PulseRATE_Report.pdf")} style={{flex:1,padding:"12px 20px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#059669,#10B981)",color: `var(--bg-card)`,fontWeight:700,cursor:"pointer",fontSize:14}}>⬇️ Download PDF</button>
-                  </div>
-                </div>}
-              </div>
-            </>}
-          </>}
-        </div>}
-
-        {/* =========== 📊 MY HEALTH HISTORY =========== */}
-        {view==="health-history"&&<div>
-          {/* Hero */}
-          <div style={{background:"linear-gradient(135deg,#059669,#10B981,#34D399)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.08}}>📊</div>
-            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:10,textTransform:"uppercase"}}>Health Analytics Dashboard</div>
-            <h1 style={{margin:"0 0 10px",fontSize:32,fontWeight:900}}>📊 My Health History</h1>
-            <p style={{margin:0,opacity:0.85,fontSize:15}}>Track your AI health screenings over time. All your prediction results in one place.</p>
-          </div>
-
-          {/* Summary Stats */}
-          {healthHistory.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:24}}>
-            {[
-              ["Total Tests",healthHistory.length,"🧪","#4338CA"],
-              ["Heart Tests",healthHistory.filter(h=>h.disease==="heart").length,"❤️","#DC2626"],
-              ["Cancer Tests",healthHistory.filter(h=>h.disease==="cancer").length,"🎗️","#DB2777"],
-              ["Diabetes Tests",healthHistory.filter(h=>h.disease==="diabetes").length,"🩺","#7C3AED"],
-            ].map(([label,val,icon,color])=><div key={label} style={{background: `var(--bg-card)`,borderRadius:14,padding:"18px 16px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",textAlign:"center"}}>
-              <div style={{fontSize:28,marginBottom:4}}>{icon}</div>
-              <div style={{fontSize:26,fontWeight:900,color}}>{val}</div>
-              <div style={{fontSize:12,color: `var(--text-muted)`,fontWeight:600}}>{label}</div>
-            </div>)}
-          </div>}
-
-          {/* CTA */}
-          <div style={{display:"flex",gap:12,marginBottom:24}}>
-            <button onClick={()=>{go("ai-checkup");fetchAiModels();}} style={{padding:"12px 24px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#4338CA,#6D28D9)",color: `var(--bg-card)`,fontWeight:700,fontSize:14,cursor:"pointer"}}>🤖 Run New Checkup</button>
-            <button onClick={fetchHealthHistory} style={{padding:"12px 24px",borderRadius:12,border:"2px solid #E5E7EB",background: `var(--bg-card)`,color: `var(--text-secondary)`,fontWeight:700,fontSize:14,cursor:"pointer"}}>🔄 Refresh</button>
-          </div>
-
-          {loadingHistory&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16}}><div style={{fontSize:40,marginBottom:12}}>⏳</div><div style={{fontWeight:700,color:"#059669"}}>Loading health history...</div></div>}
-
-          {!loadingHistory&&healthHistory.length===0&&<div style={{textAlign:"center",padding:"60px",background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:64,marginBottom:16}}>📋</div>
-            <div style={{fontSize:20,fontWeight:800,color: `var(--text-secondary)`,marginBottom:8}}>No Health Records Yet</div>
-            <div style={{fontSize:14,color: `var(--text-muted)`,marginBottom:20}}>Run your first AI Health Checkup to start tracking your health over time.</div>
-            <button onClick={()=>{go("ai-checkup");fetchAiModels();}} style={{padding:"14px 28px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#4338CA,#6D28D9)",color: `var(--bg-card)`,fontWeight:700,fontSize:14,cursor:"pointer"}}>🤖 Start AI Checkup</button>
-          </div>}
-
-          {/* Timeline */}
-          {!loadingHistory&&healthHistory.length>0&&<div style={{display:"flex",flexDirection:"column",gap:14}}>
-            {healthHistory.map((item,idx)=>{
-              const r = item.result||{};
-              const diseaseColors = {heart:"#DC2626",cancer:"#DB2777",diabetes:"#7C3AED"};
-              const diseaseIcons = {heart:"❤️",cancer:"🎗️",diabetes:"🩺"};
-              const diseaseNames = {heart:"Heart Disease",cancer:"Breast Cancer",diabetes:"Diabetes"};
-              const riskColors = {HIGH:"#DC2626",MODERATE:"#D97706",LOW:"#059669"};
-              const riskBg = {HIGH:"#FFF1F2",MODERATE:"#FFFBEB",LOW:"#F0FDF4"};
-              const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Unknown";
-              return <div key={item.id||idx} style={{background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",overflow:"hidden",borderLeft:`4px solid ${diseaseColors[item.disease]||"#6B7280"}`}}>
-                <div style={{padding:"18px 22px",display:"flex",alignItems:"center",gap:16}}>
-                  <div style={{fontSize:36}}>{diseaseIcons[item.disease]||"🔬"}</div>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-                      <div style={{fontWeight:800,fontSize:16,color: `var(--text-primary)`}}>{diseaseNames[item.disease]||"Unknown"}</div>
-                      <span style={{background:riskBg[r.risk_level]||"#F1F5F9",color:riskColors[r.risk_level]||"#6B7280",fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20}}>{r.risk_level} RISK</span>
-                    </div>
-                    <div style={{fontSize:13,color: `var(--text-muted)`}}>{r.label} — {(r.probability*100).toFixed(1)}% probability</div>
-                    <div style={{fontSize:11,color: `var(--text-muted)`,marginTop:4}}>📅 {dateStr} • Model: {r.model_used}</div>
-                  </div>
-                  <div style={{textAlign:"center"}}>
-                    <div style={{width:56,height:56,borderRadius:"50%",background:riskBg[r.risk_level]||"#F1F5F9",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,color:riskColors[r.risk_level]||"#6B7280"}}>
-                      {(r.probability*100).toFixed(0)}%
-                    </div>
-                  </div>
-                </div>
-                <div style={{borderTop:"1px solid #F1F5F9",padding:"12px 22px",background:"#FAFAFA"}}>
-                  <div style={{fontSize:12,color: `var(--text-muted)`,lineHeight:1.6}}>💡 {r.recommendation}</div>
-                </div>
-              </div>;
-            })}
-          </div>}
-        </div>}
-
-        {/* =========== 👨‍⚕️ DOCTOR DASHBOARD =========== */}
-        {view==="doctor-dash"&&isDoctor&&<div style={{paddingBottom:40}}>
-          <div style={{background:"linear-gradient(135deg,#064E3B,#065F46)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.1}}>👨‍⚕️</div>
-            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:10,textTransform:"uppercase"}}>Specialist Portal</div>
-            <h1 style={{margin:"0 0 10px",fontSize:32,fontWeight:900}}>Welcome back, Doctor</h1>
-            <p style={{margin:0,opacity:0.85,fontSize:15}}>Manage your consultations, view medical histories, and start telemedicine calls.</p>
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:32}}>
-            {[["Today's Appts",myAppointments.filter(a=>a.date==="Today").length,"📅","#059669"],["Total Consults",myAppointments.length,"📋","#0F4C81"],["Rating","4.9/5","⭐","#F59E0B"]].map(([l,v,i,c])=><div key={l} style={{background: `var(--bg-card)`,borderRadius:16,padding:"24px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",textAlign:"center"}}><div style={{fontSize:32,marginBottom:8}}>{i}</div><div style={{fontSize:28,fontWeight:900,color:c}}>{v}</div><div style={{fontSize:13,color: `var(--text-muted)`,fontWeight:600}}>{l}</div></div>)}
-          </div>
-
-          <h2 style={{fontSize:22,fontWeight:800,marginBottom:16}}>Upcoming Consultations</h2>
-          {myAppointments.length===0?(
-            <div style={{textAlign:"center",padding:60,background: `var(--bg-card)`,borderRadius:16}}><div style={{fontSize:48,marginBottom:12}}>📅</div><div style={{fontWeight:700,color: `var(--text-muted)`}}>No appointments scheduled.</div></div>
-          ):(
-            <div style={{display:"flex",flexDirection:"column",gap:16}}>
-              {myAppointments.map(apt=>(
-                <div key={apt.id} style={{background: `var(--bg-card)`,borderRadius:16,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{display:"flex",gap:20,alignItems:"center"}}>
-                    <div style={{width:50,height:50,borderRadius:"50%",background:"#F1F5F9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>👤</div>
-                    <div>
-                      <div style={{fontWeight:800,fontSize:17}}>Patient: {apt.patientName}</div>
-                      <div style={{fontSize:13,color: `var(--text-muted)`}}>🕒 {apt.time} · {apt.date} · Age: {apt.patientAge}</div>
-                      <div style={{fontSize:12,color: "#0F4C81",fontWeight:700,marginTop:4}}>Reason: {apt.reason}</div>
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:12}}>
-                    <button onClick={()=>setCallRoom(apt.id)} style={btn({background:"#059669",color:"white",padding:"10px 20px"})}>📹 Join Call</button>
-                    <button onClick={()=>{notifShow("Searching health history..."); fetchHealthHistory(); go("health-history");}} style={btn({background:"white",color:"#0F4C81",border:"1px solid #0F4C81",padding:"10px 20px"})}>📋 View Records</button>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>}
-        {view==="admin"&&isAdmin&&<div>
-          <div style={{background:"linear-gradient(135deg,#111827,#374151)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.04}}>🛡️</div>
-            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:10,textTransform:"uppercase"}}>System Administration</div>
-            <h1 style={{margin:"0 0 10px",fontSize:32,fontWeight:900}}>🛡️ Admin Dashboard</h1>
-            <p style={{margin:0,opacity:0.85,fontSize:15}}>Platform-wide statistics, appointments, and reviews oversight.</p>
-          </div>
-          
-          {loadingAdmin&&<div style={{textAlign:"center",padding:40}}>Loading Admin data...</div>}
-          
-          {!loadingAdmin&&adminStats&&<div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,marginBottom:32}}>
-              {[
-                ["Total Appts",adminStats.totalAppointments,"📋","#1e40af"],
-                ["Confirmed",adminStats.confirmedAppointments,"✅","#047857"],
-                ["Cancelled",adminStats.cancelledAppointments,"❌","#be123c"],
-                ["Total Reviews",adminStats.totalReviews,"⭐","#b45309"]
-              ].map(([l,v,i,c])=>(
-                <div key={l} style={{background: `var(--bg-card)`,borderRadius:14,padding:20,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",textAlign:"center"}}>
-                  <div style={{fontSize:28,marginBottom:8}}>{i}</div>
-                  <div style={{fontSize:32,fontWeight:900,color:c}}>{v}</div>
-                  <div style={{fontSize:13,color: `var(--text-muted)`,fontWeight:600}}>{l}</div>
+          </div>}
+
+          {/* ═══ EMERGENCY ═══ */}
+          {view === "emergency" && <div>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, #dc2626, #be185d)", color: "#fff", textAlign: "center" }}>
+              <div className="bg-ico">🚨</div>
+              <div style={{ fontSize: 48, marginBottom: 10, position: "relative", zIndex: 1, animation: "heartbeat 2s infinite" }}>🆘</div>
+              <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 800, position: "relative", zIndex: 1 }}>Emergency Services</h1>
+              <p style={{ margin: 0, opacity: 0.85, fontSize: 14, position: "relative", zIndex: 1 }}>One tap to call. Stay calm, help is coming.</p>
+            </div>
+            <div className="emer-grid">
+              {EMERGENCY_CONTACTS.map(ec => (
+                <div key={ec.number} className="emer-card">
+                  <div className="emer-top">
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 10, background: `${ec.color}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{ec.icon}</div>
+                      <div><div style={{ fontWeight: 700, fontSize: 15 }}>{ec.name}</div><div style={{ fontSize: 12, color: "var(--text-muted)" }}>{ec.desc}</div></div>
+                    </div>
+                  </div>
+                  <div className="emer-bot">
+                    <div className="emer-num" style={{ color: ec.color }}>{ec.number}</div>
+                    <a href={`tel:${ec.number}`} className="call-link" style={{ background: ec.color }}>📞 Call</a>
+                  </div>
                 </div>
               ))}
             </div>
+            <div className="banner" style={{ marginTop: 20, justifyContent: "center", flexDirection: "column", textAlign: "center", gap: 10 }}>
+              <div className="banner-title">🏥 Need a Hospital?</div>
+              <button onClick={() => go("map")} className="btn btn-success btn-lg">Find Nearest Hospital →</button>
+            </div>
+          </div>}
 
-            <h2 style={{fontSize:20,fontWeight:800,marginBottom:16}}>Hospitals with Most Bookings</h2>
-            <div style={{display:"flex",gap:16}}>
-              {adminStats.topHospitals?.map((h, i) => (
-                <div key={i} style={{background: `var(--bg-card)`,padding:"16px 20px",borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",flex:1}}>
-                  <div style={{fontWeight:800,fontSize:16,color: `var(--text-primary)`}}>{h._id}</div>
-                  <div style={{color:"#059669",fontWeight:700,marginTop:4}}>{h.count} Bookings</div>
+          {/* ═══ TIPS ═══ */}
+          {view === "tips" && <div>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, #059669, #0d9488)", color: "#fff" }}>
+              <div className="bg-ico">💡</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, opacity: 0.7, marginBottom: 12, position: "relative", zIndex: 1 }}>PULSERATE TIPS</div>
+              <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 800, position: "relative", zIndex: 1 }}>Health Tips & Awareness</h1>
+              <p style={{ margin: 0, opacity: 0.85, fontSize: 14, maxWidth: 460, position: "relative", zIndex: 1 }}>Curated tips for a healthier, happier life.</p>
+            </div>
+            <div className="cat-pills">
+              {["All", "Prevention", "Nutrition", "Mental Health", "First Aid", "Fitness", "Hygiene", "Sleep", "Hydration"].map(c => (
+                <button key={c} onClick={() => setTipsFilter(c)} className={`cat-pill ${tipsFilter === c ? "on" : ""}`}>{c}</button>
+              ))}
+            </div>
+            <div className="tips-grid">
+              {HEALTH_TIPS.filter(t => tipsFilter === "All" || t.category === tipsFilter).map(tip => (
+                <div key={tip.id} className="tip-card">
+                  <div className="tip-top">
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}><span style={{ fontSize: 24 }}>{tip.icon}</span><Badge color="gray">{tip.category}</Badge></div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{tip.title}</div>
+                  </div>
+                  <div className="tip-body">
+                    <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 10 }}>{tip.desc}</div>
+                    <div className="tip-hl">💡 {tip.tip}</div>
+                  </div>
                 </div>
               ))}
             </div>
           </div>}
-        </div>}
 
-        {/* =========== 👨‍⚕️ DOCTOR DISCOVERY VIEW =========== */}
-        {view==="doctors"&&<div>
-          <div style={{background:"linear-gradient(135deg,#0F4C81,#1E88E5)",borderRadius:20,padding:"40px 36px",marginBottom:28,color: `var(--bg-card)`,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",right:30,top:-20,fontSize:120,opacity:0.1}}>👨‍⚕️</div>
-            <div style={{fontSize:13,fontWeight:700,letterSpacing:2,opacity:0.7,marginBottom:10,textTransform:"uppercase"}}>Doctor Discovery</div>
-            <h1 style={{margin:"0 0 10px",fontSize:32,fontWeight:900}}>Find Top Specialists</h1>
-            <p style={{margin:0,opacity:0.85,fontSize:15}}>Browse over 100+ verified doctors across India's leading hospitals.</p>
-          </div>
-
-          <div style={{background: `var(--bg-card)`,borderRadius:14,padding:18,marginBottom:24,boxShadow:"0 2px 8px rgba(0,0,0,0.05)",display:"flex",gap:14,flexWrap:"wrap",alignItems:"center"}}>
-            <div style={{flex:1,minWidth:200,position:"relative"}}><span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}>🔍</span><input value={docSearch} onChange={e=>setDocSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&fetchAllDoctors()} placeholder="Search doctors by name or specialty..." style={{...inp,paddingLeft:36}}/></div>
-            <select value={docSpecFilter} onChange={e=>{setDocSpecFilter(e.target.value);}} style={{padding:"12px 16px",borderRadius:10,border:"2px solid #E5E7EB",fontSize:14,background: `var(--bg-card)`,cursor:"pointer",fontFamily:"inherit"}}>{SPECIALITIES.map(sp=><option key={sp}>{sp}</option>)}</select>
-            <button onClick={fetchAllDoctors} style={btn({background:"#0F4C81",color:"white",padding:"12px 24px"})}>Search</button>
-            <div style={{height:30,width:1,background:"#E5E7EB",margin:"0 4px"}}></div>
-            <button onClick={()=>setDocMapView(!docMapView)} style={btn({background:docMapView?"#F59E0B":"#F1F5F9",color:docMapView?"white":"#475569",border:docMapView?"none":"1px solid #E5E7EB"})}>{docMapView?"📋 Show List":"🗺️ Show Map"}</button>
-          </div>
-
-          {loadingAllDocs && <div style={{textAlign:"center",padding:60}}><div style={{fontSize:40,marginBottom:12}}>🔍</div><div style={{fontWeight:700,color:"#0F4C81"}}>Searching doctors...</div></div>}
-
-          {!loadingAllDocs && docMapView && (
-            <div style={{borderRadius:20,overflow:"hidden",boxShadow:"0 10px 30px rgba(0,0,0,0.1)",border:"1px solid #E5E7EB",height:600}}>
-              <MapContainer center={[allDoctors[0]?.lat||28.6139, allDoctors[0]?.lng||77.209]} zoom={11} style={{height:"100%",width:"100%"}}>
-                <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
-                {allDoctors.map((d,i)=>(
-                  <Marker key={i} position={[d.lat, d.lng]}>
-                    <Popup>
-                      <div style={{fontFamily:"sans-serif",minWidth:180}}>
-                        <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
-                          <div style={{fontSize:24}}>{d.img}</div>
-                          <div>
-                            <div style={{fontWeight:800,fontSize:14}}>{d.name}</div>
-                            <div style={{fontSize:12,color:"#1E88E5",fontWeight:700}}>{d.spec}</div>
-                          </div>
-                        </div>
-                        <div style={{fontSize:12,color: `var(--text-muted)`,marginBottom:8}}>🏥 {d.hospitalName}</div>
-                        <div style={{fontSize:13,marginBottom:10}}>⭐ {d.rating} · 🎓 {d.exp} yrs exp</div>
-                        <button onClick={()=>{setBookingDoctor(d); setSelectedHospital({id: Math.floor(d.id/1000), name: d.hospitalName});}} style={{width:"100%",background:"#0F4C81",color:"white",padding:"8px",borderRadius:8,border:"none",fontWeight:700,cursor:"pointer"}}>Book Appointment</button>
-                      </div>
-                    </Popup>
-                  </Marker>
+          {/* ═══ AI CHECKUP ═══ */}
+          {view === "ai-checkup" && <div>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5, #6366f1)", color: "#fff" }}>
+              <div className="bg-ico">🧠</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, opacity: 0.7, marginBottom: 12, position: "relative", zIndex: 1 }}>AI-POWERED SCREENING</div>
+              <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 800, position: "relative", zIndex: 1 }}>🤖 AI Health Checkup</h1>
+              <p style={{ margin: "0 0 16px", opacity: 0.85, fontSize: 14, maxWidth: 500, position: "relative", zIndex: 1 }}>Instant AI predictions for Heart Disease, Cancer, and Diabetes using ML models trained on real data.</p>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+                {[["3", "ML Models"], ["99%+", "Accuracy"], ["<1s", "Speed"], ["Free", "Always"]].map(([v, l]) => (
+                  <div key={l} style={{ background: "rgba(255,255,255,0.12)", borderRadius: 8, padding: "6px 16px", textAlign: "center" }}>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>{v}</div><div style={{ fontSize: 10, opacity: 0.7 }}>{l}</div>
+                  </div>
                 ))}
-              </MapContainer>
+              </div>
             </div>
-          )}
 
-          {!loadingAllDocs && !docMapView && (
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))",gap:20}}>
-              {allDoctors.map((d,i)=>(
-                <div key={i} style={{background: `var(--bg-card)`,borderRadius:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",padding:24,display:"flex",gap:20,alignItems:"start",border:"1px solid #F1F5F9",transition:"transform 0.2s"}} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-4px)"} onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-                  <div style={{width:64,height:64,borderRadius:"50%",background:"#EFF6FF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0}}>{d.img}</div>
-                  <div style={{flex:1}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:4}}>
-                      <div style={{fontWeight:800,fontSize:18}}>{d.name}</div>
-                      <div style={{fontWeight:800,color:"#15803D"}}>₹{d.fee}</div>
+            <div style={{ background: "var(--warning-light)", border: "1px solid #fde68a", borderRadius: "var(--radius-md)", padding: "12px 18px", marginBottom: 20, display: "flex", gap: 10, alignItems: "center" }}>
+              <span style={{ fontSize: 20 }}>⚠️</span>
+              <div><div style={{ fontWeight: 700, fontSize: 13, color: "var(--warning)" }}>Disclaimer</div><div style={{ fontSize: 12, color: "var(--text-muted)" }}>AI screening only. Always consult a doctor.</div></div>
+            </div>
+
+            {aiModelsLoading && <div className="empty"><div className="empty-ico">🧠</div><div className="empty-title" style={{ color: "var(--primary)" }}>Loading AI Models...</div></div>}
+            {!aiModelsLoading && !aiModels && <div className="empty"><div className="empty-ico">🔌</div><div className="empty-title">ML Server Not Connected</div><div className="empty-desc">Start: <code style={{ background: "var(--bg-surface)", padding: "3px 10px", borderRadius: 6, fontSize: 13, fontFamily: "var(--font-mono)" }}>cd healthconnect-ml && python app.py</code></div><button onClick={fetchAiModels} className="btn btn-primary">Retry 🔄</button></div>}
+
+            {aiModels && <>
+              {!aiDisease && <div>
+                <h2 className="sec-title" style={{ marginBottom: 14 }}>Select a Health Check</h2>
+                <div className="ai-grid">
+                  {[["heart", "❤️", "Heart Disease", "Analyze 13 cardiac parameters", "#dc2626"], ["cancer", "🎗️", "Breast Cancer", "Evaluate 30 tumor measurements", "#be185d"], ["diabetes", "🩺", "Diabetes", "Assess 8 diagnostic measures", "#7c3aed"]].map(([key, ico, title, desc, color]) => (
+                    <div key={key} className="ai-pick" onClick={() => { setAiDisease(key); setAiResult(null); setAiForm({}); }}>
+                      <div className="ai-pick-top" style={{ background: `${color}08` }}>
+                        <div className="ai-pick-emoji">{ico}</div>
+                        <div className="ai-pick-name" style={{ color }}>{title}</div>
+                      </div>
+                      <div style={{ padding: "14px 18px" }}>
+                        <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6, marginBottom: 10 }}>{desc}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <Badge color="gray">{aiModels[key]?.model_used}</Badge>
+                          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>AUC: {aiModels[key]?.test_auc}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div style={{fontWeight:700,color:"#1E88E5",fontSize:13,marginBottom:8}}>{d.spec}</div>
-                    <div style={{fontSize:12,color: `var(--text-muted)`,marginBottom:12,display:"flex",alignItems:"center",gap:6}}><span>🏥 {d.hospitalName}</span></div>
-                    <div style={{display:"flex",gap:12,marginBottom:16}}>
-                      <div style={{background:"#F8FAFC",padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:600,color: `var(--text-secondary)`}}>🎓 {d.exp} Years Exp</div>
-                      <div style={{background:"#FFFBEB",padding:"4px 10px",borderRadius:8,fontSize:11,fontWeight:600,color:"#D97706"}}>⭐ {d.rating}</div>
-                    </div>
-                    <button onClick={()=>{setBookingDoctor(d); setSelectedHospital({id: Math.floor(d.id/1000), name: d.hospitalName, color: COLORS[i % COLORS.length]});}} style={{width:"100%",padding:"10px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#0F4C81,#1E88E5)",color: `var(--bg-card)`,fontWeight:700,fontSize:13,cursor:"pointer"}}>Book Consultation</button>
-                  </div>
+                  ))}
                 </div>
+              </div>}
+
+              {aiDisease && aiModels[aiDisease] && <>
+                <button onClick={() => { setAiDisease(null); setAiResult(null); setAiForm({}); }} className="btn btn-ghost" style={{ marginBottom: 16 }}>← Back</button>
+                <div style={{ display: "grid", gridTemplateColumns: aiResult ? "1fr 1fr" : "1fr", gap: 20 }}>
+                  <div className="card" style={{ overflow: "hidden" }}>
+                    <div style={{ background: aiDisease === "heart" ? "linear-gradient(135deg,#dc2626,#ea580c)" : aiDisease === "cancer" ? "linear-gradient(135deg,#be185d,#7c3aed)" : "linear-gradient(135deg,#7c3aed,#4f46e5)", padding: "16px 20px", color: "#fff" }}>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{aiModels[aiDisease].icon} {aiModels[aiDisease].name}</div>
+                      <div style={{ fontSize: 12, opacity: 0.85 }}>Fill in values and click Predict</div>
+                    </div>
+                    <div style={{ padding: "18px 20px", maxHeight: "58vh", overflowY: "auto" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: aiModels[aiDisease].features.length > 10 ? "1fr 1fr" : "1fr", gap: 12 }}>
+                        {aiModels[aiDisease].features.map(f => (
+                          <div key={f.name}>
+                            <label className="form-label">{f.label}</label>
+                            {f.type === "select" ? (
+                              <select value={aiForm[f.name] || ""} onChange={e => setAiForm(p => ({ ...p, [f.name]: parseFloat(e.target.value) }))} className="form-input" style={{ cursor: "pointer" }}>
+                                <option value="">Select...</option>
+                                {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            ) : (
+                              <input type="number" step={f.step || 1} min={f.min} max={f.max} value={aiForm[f.name] || ""} onChange={e => setAiForm(p => ({ ...p, [f.name]: parseFloat(e.target.value) || 0 }))} placeholder={f.placeholder || ""} className="form-input" />
+                            )}
+                            {f.hint && <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>{f.hint}</div>}
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={runPrediction} disabled={aiLoading} className="btn btn-lg btn-primary" style={{ width: "100%", marginTop: 18 }}>
+                        {aiLoading ? "🧠 Analyzing..." : "🔬 Run AI Prediction"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {aiResult && <div id="ai-report" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div className="card" style={{ overflow: "hidden" }}>
+                      <div style={{ padding: "24px", textAlign: "center", color: "#fff", background: aiResult.risk_level === "HIGH" ? "linear-gradient(135deg,#dc2626,#be185d)" : aiResult.risk_level === "MODERATE" ? "linear-gradient(135deg,#d97706,#ea580c)" : "linear-gradient(135deg,#059669,#0d9488)" }}>
+                        <div style={{ fontSize: 52, marginBottom: 6, animation: "heartbeat 2s infinite" }}>{aiResult.risk_level === "HIGH" ? "🔴" : aiResult.risk_level === "MODERATE" ? "🟡" : "🟢"}</div>
+                        <div style={{ fontSize: 20, fontWeight: 800 }}>{aiResult.label}</div>
+                        <div style={{ fontSize: 14, opacity: 0.9 }}>{aiResult.risk_level} RISK</div>
+                      </div>
+                      <div style={{ padding: "18px 22px" }}>
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600, marginBottom: 5 }}><span>Probability</span><span>{(aiResult.probability * 100).toFixed(1)}%</span></div>
+                          <div className="prob-track"><div className="prob-fill" style={{ width: `${aiResult.probability * 100}%`, background: aiResult.risk_level === "HIGH" ? "linear-gradient(90deg,#dc2626,#be185d)" : aiResult.risk_level === "MODERATE" ? "linear-gradient(90deg,#d97706,#ea580c)" : "linear-gradient(90deg,#059669,#0d9488)" }} /></div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {[["Confidence", `${(aiResult.confidence * 100).toFixed(1)}%`], ["Model", aiResult.model_used]].map(([k, v]) => (
+                            <div key={k} style={{ background: "var(--bg-surface)", borderRadius: "var(--radius-sm)", padding: "10px 12px", textAlign: "center", border: "1px solid var(--border-light)" }}>
+                              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 1 }}>{k}</div>
+                              <div style={{ fontWeight: 800, fontSize: 14 }}>{v}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card" style={{ padding: "16px 20px" }}>
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}>📋 Recommendation</div>
+                      <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.7 }}>{aiResult.recommendation}</div>
+                    </div>
+                    <div style={{ background: "var(--danger-light)", border: "1px solid #fecaca", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>⚠️ AI screening only. Consult a doctor.</div>
+                    {(aiResult.risk_level === "HIGH" || aiResult.risk_level === "MODERATE") && <button onClick={() => bookSpecialist(aiDisease)} className="btn btn-primary btn-lg" style={{ width: "100%" }}>🏥 Book a Specialist</button>}
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button onClick={() => { setAiResult(null); setAiForm({}); }} className="btn btn-outline" style={{ flex: 1 }}>🔄 New</button>
+                      <button onClick={() => downloadPDF("ai-report", "PulseRATE_Report.pdf")} className="btn btn-success" style={{ flex: 1 }}>⬇️ PDF</button>
+                    </div>
+                  </div>}
+                </div>
+              </>}
+            </>}
+          </div>}
+
+          {/* ═══ HEALTH HISTORY ═══ */}
+          {view === "health-history" && <div>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, #059669, #0891b2)", color: "#fff" }}>
+              <div className="bg-ico">📊</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, opacity: 0.7, marginBottom: 12, position: "relative", zIndex: 1 }}>HEALTH ANALYTICS</div>
+              <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 800, position: "relative", zIndex: 1 }}>📊 My Health History</h1>
+              <p style={{ margin: 0, opacity: 0.85, fontSize: 14, position: "relative", zIndex: 1 }}>Track your AI health screenings over time.</p>
+            </div>
+            {healthHistory.length > 0 && <div className="stats-row" style={{ marginBottom: 20 }}>
+              {[["Total Tests", healthHistory.length, "🧪", "var(--primary)"], ["Heart", healthHistory.filter(h => h.disease === "heart").length, "❤️", "var(--danger)"], ["Cancer", healthHistory.filter(h => h.disease === "cancer").length, "🎗️", "#be185d"], ["Diabetes", healthHistory.filter(h => h.disease === "diabetes").length, "🩺", "#7c3aed"]].map(([l, v, i, c]) => (
+                <div key={l} className="stat-card"><div style={{ fontSize: 24, marginBottom: 4 }}>{i}</div><div className="stat-val" style={{ color: c }}>{v}</div><div className="stat-lbl">{l}</div></div>
+              ))}
+            </div>}
+            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+              <button onClick={() => { go("ai-checkup"); fetchAiModels(); }} className="btn btn-primary">🤖 New Checkup</button>
+              <button onClick={fetchHealthHistory} className="btn btn-outline">🔄 Refresh</button>
+            </div>
+            {loadingHistory && <div className="empty"><div className="empty-ico">⏳</div><div className="empty-title" style={{ color: "var(--primary)" }}>Loading...</div></div>}
+            {!loadingHistory && healthHistory.length === 0 && <div className="empty"><div className="empty-ico">📋</div><div className="empty-title">No Records</div><div className="empty-desc">Run your first AI checkup to start tracking.</div><button onClick={() => { go("ai-checkup"); fetchAiModels(); }} className="btn btn-primary">Start Checkup</button></div>}
+            {!loadingHistory && healthHistory.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {healthHistory.map((item, idx) => {
+                const r = item.result || {};
+                const dColors = { heart: "#dc2626", cancer: "#be185d", diabetes: "#7c3aed" };
+                const dIcons = { heart: "❤️", cancer: "🎗️", diabetes: "🩺" };
+                const dNames = { heart: "Heart Disease", cancer: "Breast Cancer", diabetes: "Diabetes" };
+                const rColors = { HIGH: "#dc2626", MODERATE: "#d97706", LOW: "#059669" };
+                const ds = item.timestamp ? new Date(item.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Unknown";
+                return (
+                  <div key={item.id || idx} className="tl-card" style={{ borderLeftColor: dColors[item.disease] || "var(--text-muted)" }}>
+                    <div className="tl-body">
+                      <div style={{ fontSize: 32 }}>{dIcons[item.disease] || "🔬"}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                          <div style={{ fontWeight: 700, fontSize: 15 }}>{dNames[item.disease] || "Unknown"}</div>
+                          <span className="badge" style={{ background: `${rColors[r.risk_level] || "#94a3b8"}15`, color: rColors[r.risk_level] || "#94a3b8" }}>{r.risk_level} RISK</span>
+                        </div>
+                        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{r.label} — {(r.probability * 100).toFixed(1)}%</div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>📅 {ds} · {r.model_used}</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", background: `${rColors[r.risk_level] || "#94a3b8"}12`, border: `2px solid ${rColors[r.risk_level] || "#94a3b8"}30`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, color: rColors[r.risk_level] }}>
+                          {(r.probability * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                    </div>
+                    <div className="tl-foot"><div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>💡 {r.recommendation}</div></div>
+                  </div>
+                );
+              })}
+            </div>}
+          </div>}
+
+          {/* ═══ DOCTOR DASHBOARD ═══ */}
+          {view === "doctor-dash" && isDoctor && <div>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, #059669, #047857)", color: "#fff" }}>
+              <div className="bg-ico">👨‍⚕️</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, opacity: 0.7, marginBottom: 12, position: "relative", zIndex: 1 }}>SPECIALIST PORTAL</div>
+              <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 800, position: "relative", zIndex: 1 }}>Welcome back, Doctor</h1>
+              <p style={{ margin: 0, opacity: 0.85, fontSize: 14, position: "relative", zIndex: 1 }}>Manage consultations and telemedicine calls.</p>
+            </div>
+            <div className="stats-row" style={{ gridTemplateColumns: "repeat(3,1fr)", marginBottom: 24 }}>
+              {[["Today", myAppointments.filter(a => a.date === "Today").length, "📅", "var(--success)"], ["Total", myAppointments.length, "📋", "var(--primary)"], ["Rating", "4.9/5", "⭐", "var(--warning)"]].map(([l, v, i, c]) => (
+                <div key={l} className="stat-card"><div style={{ fontSize: 28, marginBottom: 6 }}>{i}</div><div className="stat-val" style={{ color: c }}>{v}</div><div className="stat-lbl">{l}</div></div>
               ))}
             </div>
-          )}
-          
-          {!loadingAllDocs && allDoctors.length === 0 && (
-            <div style={{textAlign:"center",padding:80,background: `var(--bg-card)`,borderRadius:20}}>
-              <div style={{fontSize:64,marginBottom:16}}>🔬</div>
-              <div style={{fontSize:20,fontWeight:800}}>No Doctors Found</div>
-              <div style={{color: `var(--text-muted)`}}>Try searching for a different specialty or keyword.</div>
+            <h2 className="sec-title" style={{ marginBottom: 14 }}>Upcoming Consultations</h2>
+            {myAppointments.length === 0 ? <div className="empty"><div className="empty-ico">📅</div><div className="empty-title">No appointments</div></div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {myAppointments.map(apt => (
+                  <div key={apt.id} className="card" style={{ padding: 18, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                      <div className="doc-av">👤</div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 16 }}>Patient: {apt.patientName}</div>
+                        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>🕒 {apt.time} · {apt.date} · Age: {apt.patientAge}</div>
+                        <div style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, marginTop: 3 }}>Reason: {apt.reason}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button onClick={() => setCallRoom(apt.id)} className="btn btn-success btn-sm">📹 Join Call</button>
+                      <button onClick={() => { fetchHealthHistory(); go("health-history"); }} className="btn btn-outline btn-sm">📋 Records</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>}
+
+          {/* ═══ ADMIN ═══ */}
+          {view === "admin" && isAdmin && <div>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)", color: "#fff" }}>
+              <div className="bg-ico">🛡️</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, opacity: 0.7, marginBottom: 12, position: "relative", zIndex: 1 }}>ADMINISTRATION</div>
+              <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 800, position: "relative", zIndex: 1 }}>🛡️ Admin Dashboard</h1>
+              <p style={{ margin: 0, opacity: 0.85, fontSize: 14, position: "relative", zIndex: 1 }}>Platform statistics and oversight.</p>
             </div>
-          )}
+            {loadingAdmin && <div style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>Loading...</div>}
+            {!loadingAdmin && adminStats && <div>
+              <div className="stats-row" style={{ marginBottom: 24 }}>
+                {[["Appointments", adminStats.totalAppointments, "📋", "var(--primary)"], ["Confirmed", adminStats.confirmedAppointments, "✅", "var(--success)"], ["Cancelled", adminStats.cancelledAppointments, "❌", "var(--danger)"], ["Reviews", adminStats.totalReviews, "⭐", "var(--warning)"]].map(([l, v, i, c]) => (
+                  <div key={l} className="stat-card"><div style={{ fontSize: 24, marginBottom: 6 }}>{i}</div><div className="stat-val" style={{ color: c }}>{v}</div><div className="stat-lbl">{l}</div></div>
+                ))}
+              </div>
+              <h2 className="sec-title" style={{ marginBottom: 14 }}>Top Hospitals</h2>
+              <div style={{ display: "flex", gap: 14 }}>
+                {adminStats.topHospitals?.map((h, i) => (
+                  <div key={i} className="card" style={{ padding: "14px 18px", flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{h._id}</div>
+                    <div style={{ color: "var(--success)", fontWeight: 700, marginTop: 3 }}>{h.count} Bookings</div>
+                  </div>
+                ))}
+              </div>
+            </div>}
+          </div>}
+
+          {/* ═══ DOCTORS ═══ */}
+          {view === "doctors" && <div>
+            <div className="sub-hero" style={{ background: "linear-gradient(135deg, #2563eb, #1e40af)", color: "#fff" }}>
+              <div className="bg-ico">👨‍⚕️</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, opacity: 0.7, marginBottom: 12, position: "relative", zIndex: 1 }}>DOCTOR DISCOVERY</div>
+              <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 800, position: "relative", zIndex: 1 }}>Find Top Specialists</h1>
+              <p style={{ margin: 0, opacity: 0.85, fontSize: 14, position: "relative", zIndex: 1 }}>100+ verified doctors across India's leading hospitals.</p>
+            </div>
+            <div className="filter-bar">
+              <div className="filter-wrap"><span className="ico-sm">🔍</span><input value={docSearch} onChange={e => setDocSearch(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchAllDoctors()} placeholder="Search doctors..." className="f-input" /></div>
+              <select value={docSpecFilter} onChange={e => setDocSpecFilter(e.target.value)} className="f-select" style={{ maxWidth: 170 }}>{SPECIALITIES.map(sp => <option key={sp}>{sp}</option>)}</select>
+              <button onClick={fetchAllDoctors} className="btn btn-primary btn-sm">Search</button>
+              <div style={{ height: 24, width: 1, background: "var(--border)" }} />
+              <button onClick={() => setDocMapView(!docMapView)} className={`btn btn-sm ${docMapView ? "btn-primary" : "btn-outline"}`}>{docMapView ? "📋 List" : "🗺️ Map"}</button>
+            </div>
+            {loadingAllDocs && <div className="empty"><div className="empty-ico">🔍</div><div className="empty-title" style={{ color: "var(--primary)" }}>Searching...</div></div>}
+            {!loadingAllDocs && docMapView && (
+              <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--border)", height: 550 }}>
+                <MapContainer center={[allDoctors[0]?.lat || 28.6139, allDoctors[0]?.lng || 77.209]} zoom={11} style={{ height: "100%", width: "100%" }}>
+                  <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                  {allDoctors.map((d, i) => (
+                    <Marker key={i} position={[d.lat, d.lng]}>
+                      <Popup>
+                        <div style={{ fontFamily: "var(--font-body)", minWidth: 180 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{d.name}</div>
+                          <div style={{ fontSize: 12, color: "#2563eb", fontWeight: 600, marginBottom: 4 }}>{d.spec}</div>
+                          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>🏥 {d.hospitalName}</div>
+                          <div style={{ fontSize: 13, marginBottom: 8 }}>⭐ {d.rating} · {d.exp} yrs</div>
+                          <button onClick={() => { setBookingDoctor(d); setSelectedHospital({ id: Math.floor(d.id / 1000), name: d.hospitalName }); }} style={{ width: "100%", background: "#2563eb", color: "#fff", padding: "7px", borderRadius: 8, border: "none", fontWeight: 700, cursor: "pointer" }}>Book</button>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              </div>
+            )}
+            {!loadingAllDocs && !docMapView && (
+              <div className="doc-grid">
+                {allDoctors.map((d, i) => (
+                  <div key={i} className="doc-card">
+                    <div className="doc-av">{d.img}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 3 }}>
+                        <div style={{ fontWeight: 700, fontSize: 16 }}>{d.name}</div>
+                        <div style={{ fontWeight: 800, color: "var(--success)" }}>₹{d.fee}</div>
+                      </div>
+                      <div style={{ fontWeight: 600, color: "var(--primary)", fontSize: 13, marginBottom: 6 }}>{d.spec}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>🏥 {d.hospitalName}</div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                        <span style={{ background: "var(--bg-surface)", padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", border: "1px solid var(--border-light)" }}>🎓 {d.exp} yrs</span>
+                        <span style={{ background: "var(--bg-surface)", padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, color: "var(--warning)", border: "1px solid var(--border-light)" }}>⭐ {d.rating}</span>
+                      </div>
+                      <button onClick={() => { setBookingDoctor(d); setSelectedHospital({ id: Math.floor(d.id / 1000), name: d.hospitalName, color: COLORS[i % COLORS.length] }); }} className="btn btn-primary" style={{ width: "100%" }}>Book Consultation</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!loadingAllDocs && allDoctors.length === 0 && <div className="empty"><div className="empty-ico">🔬</div><div className="empty-title">No Doctors Found</div><div className="empty-desc">Try a different specialty.</div></div>}
+          </div>}
+        </div>
+
+        {/* ═══ TELEMEDICINE ═══ */}
+        {callRoom && <div className="vc-overlay">
+          <div className="vc-box">
+            <div className="vc-head">
+              <div style={{ fontWeight: 700, fontSize: 15 }}>📹 Telemedicine: {callRoom}</div>
+              <button onClick={() => setCallRoom(null)} className="btn btn-danger btn-sm">End Call</button>
+            </div>
+            <div style={{ flex: 1, background: "var(--bg-body)" }}>
+              <iframe src={`https://meet.jit.si/HC_${callRoom}`} allow="camera; microphone; fullscreen" style={{ width: "100%", height: "100%", border: "none" }} title="Video Call" />
+            </div>
+          </div>
         </div>}
 
-      </div>
-
-      {/* =========== 📹 TELEMEDICINE OVERLAY =========== */}
-      {callRoom&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-        <div style={{width:"90%",maxWidth:1000,height:"80vh",background: `var(--bg-card)`,borderRadius:20,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          <div style={{padding:"16px 20px",background: `var(--text-primary)`,color: `var(--bg-card)`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontWeight:800,fontSize:16}}>📹 Secure Telemedicine Call: {callRoom}</div>
-            <button onClick={()=>setCallRoom(null)} style={btn({background:"#EF4444",color: `var(--bg-card)`,padding:"8px 16px"})}>End Call / Close</button>
-          </div>
-          <div style={{flex:1,background: `var(--border-light)`}}>
-            <iframe 
-              src={`https://meet.jit.si/HC_${callRoom}`} 
-              allow="camera; microphone; fullscreen; display-capture" 
-              style={{width:"100%",height:"100%",border:"none"}} 
-              title="Telemedicine Video Call"
-            />
-          </div>
-        </div>
-      </div>}
-
-      {/* =========== 🆕 FOOTER =========== */}
-      <footer style={{background:"linear-gradient(135deg,#0F4C81,#0A2E4E)",color: `var(--bg-card)`,padding:"48px 20px 24px",marginTop:40}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:32,marginBottom:32}}>
-            <div>
-              <div style={{display: "flex", alignItems: "center", gap: 10, marginBottom: 16}}>
-                <img src="/pulserate-logo.png?v=2" alt="PulseRATE Logo" style={{height: 32, filter: "brightness(0) invert(1)"}} />
-                <div style={{fontSize:22,fontWeight:900}}>PULSERATE</div>
+        {/* ═══ FOOTER ═══ */}
+        <footer className="footer">
+          <div className="footer-inner">
+            <div className="footer-grid">
+              <div>
+                <div className="footer-brand">
+                  <img src="/pulserate-logo.png?v=2" alt="PulseRATE" />
+                  <div className="footer-brand-text">Pulse<span className="rate">RATE</span></div>
+                </div>
+                <div className="footer-desc">India's trusted AI-powered healthcare platform. Find, compare, and book the best care.</div>
               </div>
-              <div style={{fontSize:13,opacity:0.7,lineHeight:1.8}}>India's trusted healthcare platform. Find, compare, and book the best care near you.</div>
+              <div>
+                <div className="footer-title">Quick Links</div>
+                {[["🏥 Hospitals", "list"], ["👨‍⚕️ Doctors", "doctors"], ["🧪 Compare", "compare"], ["🗺️ Map", "map"], ["💡 Tips", "tips"]].map(([l, v]) => (
+                  <div key={v} className="footer-link" onClick={() => { go(v); if (v === "doctors") fetchAllDoctors(); }}>{l}</div>
+                ))}
+              </div>
+              <div>
+                <div className="footer-title">Emergency</div>
+                {[["🚑 Ambulance", "102"], ["👮 Police", "100"], ["🚒 Fire", "101"], ["🆘 Universal", "112"]].map(([l, n]) => (
+                  <div key={n} className="footer-link">{l}: <strong style={{ color: "var(--primary)" }}>{n}</strong></div>
+                ))}
+              </div>
+              <div>
+                <div className="footer-title">Contact</div>
+                <div className="footer-desc">📧 support@pulserate.in<br />📍 New Delhi, India<br />🕐 24/7 Support</div>
+              </div>
             </div>
-            <div>
-              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Quick Links</div>
-              {[["🏥 Hospitals","list"],["👨‍⚕️ Find Doctors","doctors"],["🧪 Compare Tests","compare"],["🗺️ Map View","map"],["💡 Health Tips","tips"]].map(([l,v])=><div key={v} onClick={()=>{go(v); if(v==="doctors") fetchAllDoctors();}} style={{fontSize:13,opacity:0.7,marginBottom:8,cursor:"pointer"}}>{l}</div>)}
-            </div>
-            <div>
-              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Emergency</div>
-              {[["🚑 Ambulance","102"],["👮 Police","100"],["🚒 Fire Brigade","101"],["🆘 Universal","112"]].map(([l,n])=><div key={n} style={{fontSize:13,opacity:0.7,marginBottom:8}}>{l}: <strong>{n}</strong></div>)}
-            </div>
-            <div>
-              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Contact Us</div>
-              <div style={{fontSize:13,opacity:0.7,lineHeight:2}}>📧 support@pulserate.in<br/>📍 New Delhi, India<br/>🕐 24/7 Support Available</div>
+            <div className="footer-bot">
+              <div className="footer-copy">© 2026 PulseRATE. All rights reserved. Made with ❤️ in India.</div>
+              <div className="footer-socials">
+                {["Twitter", "LinkedIn", "GitHub", "Instagram"].map(s => <span key={s} className="footer-social">{s}</span>)}
+              </div>
             </div>
           </div>
-          <div style={{borderTop:"1px solid rgba(255,255,255,0.15)",paddingTop:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontSize:12,opacity:0.5}}>© 2026 PulseRATE. All rights reserved. Made with ❤️ in India.</div>
-            <div style={{display:"flex",gap:12}}>
-              {["Twitter","LinkedIn","GitHub","Instagram"].map(s=><span key={s} style={{fontSize:12,opacity:0.5,cursor:"pointer"}}>{s}</span>)}
-            </div>
-          </div>
-        </div>
-      </footer>
+        </footer>
 
-      {/* 🤖 Chatbot UI Injection */}
-      <ChatbotWidget />
-
-      <style>{`*{box-sizing:border-box;}select,input,textarea,button{font-family:'Nunito','Segoe UI',sans-serif;}`}</style>
-    </div>
+        <ChatbotWidget />
+      </div>
+    </>
   );
 }
